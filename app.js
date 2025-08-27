@@ -129,4 +129,44 @@ $("#plDelete").onclick = async () => {
 $("#r2List").onclick = async () => {
   const prefix = $("#r2Prefix").value.trim();
   const r = await api(`/api/files/list?prefix=${encodeURIComponent(prefix)}&limit=200`);
-  $("#r2Count").text
+  $("#r2Count").textContent = `${r.count} oggetti`;
+  const rows = r.items.map(x =>
+    `<tr>
+      <td>${x.key}</td>
+      <td class="muted">${x.size} B</td>
+      <td><button data-key="${x.key}" class="del">Elimina</button></td>
+      <td><button data-key="${x.key}" class="send primary">Enqueue→Device</button></td>
+    </tr>`
+  ).join("");
+  $("#r2Table").innerHTML = `<tr><th>Key</th><th>Size</th><th></th><th></th></tr>${rows}`;
+
+  $("#r2Table").querySelectorAll("button.del").forEach(btn => {
+    btn.onclick = async () => {
+      const key = btn.getAttribute("data-key");
+      if (!confirm(`Eliminare ${key}?`)) return;
+      await api(`/api/files/delete?r2_key=${encodeURIComponent(key)}`, { method: "DELETE" });
+      $("#r2List").click();
+    };
+  });
+  $("#r2Table").querySelectorAll("button.send").forEach(btn => {
+    btn.onclick = async () => {
+      const key = btn.getAttribute("data-key");
+      await api(`/api/cmd/enqueue-r2?device=${encodeURIComponent(loadCfg().device)}&r2_key=${encodeURIComponent(key)}`, { method: "POST" });
+    };
+  });
+};
+
+$("#upSend").onclick = async () => {
+  const f = $("#upFile").files?.[0];
+  if (!f) { $("#upOut").textContent = "Seleziona un file"; return; }
+  const prefix = $("#upPrefix").value.trim();
+  const fd = new FormData();
+  fd.append("file", f, f.name);
+  try {
+    const r = await api(`/api/files/upload?prefix=${encodeURIComponent(prefix)}`, { method: "POST", body: fd });
+    $("#upOut").textContent = `OK: ${r.key}`;
+    $("#r2List").click();
+  } catch (e) {
+    $("#upOut").textContent = `Errore upload: ${e.message}`;
+  }
+};
