@@ -135,7 +135,7 @@ $("#r2List").onclick = async () => {
       <td>${x.key}</td>
       <td class="muted">${x.size} B</td>
       <td><button data-key="${x.key}" class="del">Elimina</button></td>
-      <td><button data-key="${x.key}" class="send primary">Enqueue→Device</button></td>
+      <td><button data-key="${x.key}" class="send primary">Metti in coda→Device</button></td>
     </tr>`
   ).join("");
   $("#r2Table").innerHTML = `<tr><th>Key</th><th>Size</th><th></th><th></th></tr>${rows}`;
