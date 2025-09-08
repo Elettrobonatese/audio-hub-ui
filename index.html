@@ -52,14 +52,17 @@
     }
     button {
       cursor: pointer;
-      transition: all 0.2s ease; 
+      transition: all 0.2s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
     }
     button:hover {
-      transform: scale(1.05); 
+      transform: scale(1.05);
       opacity: 0.9;
     }
     button:active {
-      transform: scale(0.95); 
+      transform: scale(0.95);
       opacity: 0.8;
     }
     button.primary {
@@ -87,7 +90,7 @@
 
     label.muted {
       display: block;
-      margin: 8px 0; 
+      margin: 8px 0;
     }
 
     table {
@@ -106,6 +109,12 @@
     .ok { color:#22c55e; }
     .err { color:#ef4444; }
 
+    button i {
+      width: 20px;
+      height: 20px;
+      display: inline-block;
+    }
+
     @media (max-width: 900px) {
       .grid-6, .grid-4, .grid-3, .grid-8 {
         grid-column: span 12;
@@ -122,6 +131,8 @@
       }
     }
   </style>
+  
+  <script src="https://unpkg.com/lucide@latest"></script>
 </head>
 <body>
   <header>
@@ -151,11 +162,11 @@
     <section class="card grid-6">
       <h3>Player</h3>
       <div class="row">
-        <button id="btnPlay" class="primary">Play</button>
-        <button id="btnPause">Pause</button>
-        <button id="btnStop">Stop</button>
-        <button id="btnPrev">Prev</button>
-        <button id="btnNext">Next</button>
+        <button id="btnPlay" class="primary"><i data-lucide="play"></i></button>
+        <button id="btnPause"><i data-lucide="pause"></i></button>
+        <button id="btnStop"><i data-lucide="square"></i></button>
+        <button id="btnPrev"><i data-lucide="skip-back"></i></button>
+        <button id="btnNext"><i data-lucide="skip-forward"></i></button>
         <button id="btnClear" class="warn">Clear</button>
       </div>
       <div class="row" style="margin-top:8px">
@@ -185,8 +196,8 @@
         <button id="plSend" class="primary">Invia al device</button>
         <button id="plDelete" class="warn">Elimina</button>
       </div>
-      <div >
-        <label class="muted" style="display:block; margin:20px 0;">
+      <div style="margin-top:8px">
+        <label class="muted">
           Sostituisci contenuto (una <code>r2_key</code> per riga oppure separata da <code>;</code>)
         </label>
         <textarea id="plReplaceBox" placeholder="esempio:
@@ -229,5 +240,9 @@ test/hello.mp3"></textarea>
   </main>
 
   <script src="app.js"></script>
+  <script>
+    
+    lucide.createIcons();
+  </script>
 </body>
 </html>
