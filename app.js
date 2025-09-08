@@ -126,17 +126,46 @@ $("#plDelete").onclick = async () => {
   $("#plResult").textContent = JSON.stringify(r, null, 2);
 };
 
+// Inject responsive CSS for action buttons in table
+const style = document.createElement("style");
+style.textContent = `
+  .actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  @media (max-width: 600px) {
+    .actions {
+      flex-direction: column;
+      align-items: stretch;
+    }
+
+    .actions button {
+      width: 100%;
+    }
+  }
+`;
+document.head.appendChild(style);
+
+
 $("#r2List").onclick = async () => {
   const prefix = $("#r2Prefix").value.trim();
   const r = await api(`/api/files/list?prefix=${encodeURIComponent(prefix)}&limit=200`);
   $("#r2Count").textContent = `${r.count} oggetti`;
   const rows = r.items.map(x =>
-    `<tr>
-      <td>${x.key}</td>
-      <td class="muted">${x.size} B</td>
-      <td><button data-key="${x.key}" class="del">Elimina</button></td>
-      <td><button data-key="${x.key}" class="send primary">Metti in coda→Device</button></td>
-    </tr>`
+  
+ `<tr>
+    <td>${x.key}</td>
+    <td class="muted">${x.size} B</td>
+    <td colspan="2">
+      <div class="actions">
+        <button data-key="${x.key}" class="del">Elimina</button>
+        <button data-key="${x.key}" class="send primary">Metti in coda→Device</button>
+      </div>
+    </td>
+  </tr>`
+
   ).join("");
   $("#r2Table").innerHTML = `<tr><th>Key</th><th>Size</th><th></th><th></th></tr>${rows}`;
 
