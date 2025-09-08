@@ -130,6 +130,66 @@
         width: 100%;
       }
     }
+	
+	.player-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+@media (max-width: 600px) {
+  .player-buttons {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+  }
+
+  .player-buttons button:nth-child(n+4) {
+    grid-column: span 1;
+  }
+}
+
+/* Volume & Seek responsive layout */
+.volume-group,
+.seek-group {
+  flex-wrap: wrap;
+  margin: 20px 0 ;
+  gap: 8px;
+}
+
+.vol-adjust,
+.seek-adjust {
+  display: flex;
+  gap: 8px;
+}
+
+@media (max-width: 600px) {
+  .volume-group,
+  .seek-group {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .volume-group input,
+  .seek-group input,
+  .volume-group button,
+  .seek-group button {
+    width: 100%;
+  }
+
+  .vol-adjust,
+  .seek-adjust {
+    flex-direction: row;
+    justify-content: space-between;
+  }
+
+  .vol-adjust button,
+  .seek-adjust button {
+    flex: 1;
+  }
+}
+
+
   </style>
   
   <script src="https://unpkg.com/lucide@latest"></script>
@@ -161,28 +221,38 @@
 
     <section class="card grid-6">
       <h3>Player</h3>
-      <div class="row">
-        <button id="btnPlay" class="primary"><i data-lucide="play"></i></button>
-        <button id="btnPause"><i data-lucide="pause"></i></button>
-        <button id="btnStop"><i data-lucide="square"></i></button>
-        <button id="btnPrev"><i data-lucide="skip-back"></i></button>
-        <button id="btnNext"><i data-lucide="skip-forward"></i></button>
-        <button id="btnClear" class="warn">Clear</button>
-      </div>
-      <div class="row" style="margin-top:8px">
-        <label>Volume</label>
-        <input type="number" id="volAbs" min="0" max="200" value="75" style="width:80px" />
-        <button id="btnVolAbs">Imposta</button>
-        <button id="btnVolDown">-10</button>
-        <button id="btnVolUp">+10</button>
-      </div>
-      <div class="row" style="margin-top:8px">
-        <label>Seek (s)</label>
-        <input type="number" id="seekAbs" min="0" max="9999" value="60" style="width:80px" />
-        <button id="btnSeekAbs">Vai</button>
-        <button id="btnSeekBack">-15s</button>
-        <button id="btnSeekFwd">+15s</button>
-      </div>
+      
+<div class="player-buttons">
+  <button id="btnPlay" class="primary"><i data-lucide="play"></i></button>
+  <button id="btnPause"><i data-lucide="pause"></i></button>
+  <button id="btnStop"><i data-lucide="square"></i></button>
+  <button id="btnPrev"><i data-lucide="skip-back"></i></button>
+  <button id="btnNext"><i data-lucide="skip-forward"></i></button>
+  <button id="btnClear" class="warn">Clear</button>
+</div>
+
+      <!-- Volume -->
+<div class="row volume-group">
+  <label>Volume</label>
+  <input type="number" id="volAbs" min="0" max="200" value="75" style="width:80px" />
+  <button id="btnVolAbs">Imposta</button>
+  <div class="vol-adjust">
+    <button id="btnVolDown">-10</button>
+    <button id="btnVolUp">+10</button>
+  </div>
+</div>
+
+<!-- Seek -->
+<div class="row seek-group" style="margin-top:8px">
+  <label>Seek (s)</label>
+  <input type="number" id="seekAbs" min="0" max="9999" value="60" style="width:80px" />
+  <button id="btnSeekAbs">Vai</button>
+  <div class="seek-adjust">
+    <button id="btnSeekBack">-15s</button>
+    <button id="btnSeekFwd">+15s</button>
+  </div>
+</div>
+
       <div class="muted" id="nowPlaying" style="margin-top:10px">now playing…</div>
     </section>
 
