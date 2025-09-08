@@ -161,7 +161,7 @@ $("#r2List").onclick = async () => {
     <td colspan="2">
       <div class="actions">
         <button data-key="${x.key}" class="del">Elimina</button>
-        <button data-key="${x.key}" class="send primary">Metti in coda→Device</button>
+        <button data-key="${x.key}" class="send primary">Metti in coda</button>
       </div>
     </td>
   </tr>`
