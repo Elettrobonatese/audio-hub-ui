@@ -64,6 +64,16 @@
       .cover{width:72px;height:72px}
       .two-cols{grid-template-columns:1fr}
     }
+    /* 🔧 Mostra la modale quando la classe 'show' è sul BACKDROP */
+.modal-backdrop { display: none; }
+.modal-backdrop.show { display: flex; }
+
+/* 🔒 Blocca tutta la UI quando non autenticato */
+body.locked main,
+body.locked header .right > *:not(#btnLogin) {
+  pointer-events: none;
+  filter: grayscale(1) opacity(0.6);
+}
   </style>
   <script src="https://unpkg.com/lucide@latest"></script>
 </head>
