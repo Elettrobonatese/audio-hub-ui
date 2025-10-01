@@ -119,22 +119,28 @@ body.locked header .right > *:not(#btnLogin) {
             <input id="seekBar" type="range" min="0" max="0" value="0" class="range">
           </div>
 
-          <div class="controls">
-            <button id="btnPrev"  class="pill"><i data-lucide="skip-back"></i></button>
-            <button id="btnPlay"  class="pill primary"><i data-lucide="play"></i></button>
-            <button id="btnPause" class="pill"><i data-lucide="pause"></i></button>
-            <button id="btnStop"  class="pill"><i data-lucide="square"></i></button>
-            <button id="btnNext"  class="pill"><i data-lucide="skip-forward"></i></button>
+<div class="controls">
+  <button id="btnPrev"  class="pill"><i data-lucide="skip-back"></i></button>
 
-            <div class="row" style="margin-left:8px">
-              <small class="muted">Vol</small>
-              <input id="volAbs" type="number" min="0" max="200" value="75" style="width:76px">
-              <button id="btnVolAbs" class="pill">Set</button>
-              <button id="btnVolDown" class="pill">-10</button>
-              <button id="btnVolUp" class="pill">+10</button>
-              <button id="btnClear" class="pill warn">Clear</button>
-            </div>
-          </div>
+  <!-- Play/Pause: uno solo visibile per volta; quello visibile è blu -->
+  <button id="btnPlay"  class="pill primary"><i data-lucide="play"></i></button>
+  <button id="btnPause" class="pill" style="display:none"><i data-lucide="pause"></i></button>
+
+  <button id="btnStop"  class="pill"><i data-lucide="square"></i></button>
+  <button id="btnNext"  class="pill"><i data-lucide="skip-forward"></i></button>
+
+  <!-- NUOVO: Loop (repeat brano corrente); quando attivo diventa blu -->
+  <button id="btnLoop"  class="pill" title="Ripeti brano"><i data-lucide="repeat"></i></button>
+
+  <div class="row" style="margin-left:8px">
+    <small class="muted">Vol</small>
+    <input id="volAbs" type="number" min="0" max="200" value="75" style="width:76px">
+    <button id="btnVolAbs" class="pill">Set</button>
+    <button id="btnVolDown" class="pill">-10</button>
+    <button id="btnVolUp" class="pill">+10</button>
+    <button id="btnClear" class="pill warn">Clear</button>
+  </div>
+</div>
         </div>
       </div>
 
