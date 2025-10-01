@@ -65,15 +65,29 @@
       .two-cols{grid-template-columns:1fr}
     }
     /* 🔧 Mostra la modale quando la classe 'show' è sul BACKDROP */
-.modal-backdrop { display: none; }
-.modal-backdrop.show { display: flex; }
+    .modal-backdrop { display: none; }
+    .modal-backdrop.show { display: flex; }
 
-/* 🔒 Blocca tutta la UI quando non autenticato */
-body.locked main,
-body.locked header .right > *:not(#btnLogin) {
-  pointer-events: none;
-  filter: grayscale(1) opacity(0.6);
-}
+    /* 🔒 Blocca tutta la UI quando non autenticato */
+    body.locked main,
+    body.locked header .right > *:not(#btnLogin) {
+      pointer-events: none;
+      filter: grayscale(1) opacity(0.6);
+    }
+
+    /* Toggle ON/OFF stile pill */
+    .toggle {
+      border-radius: 999px;
+      padding: 6px 12px;
+      background: transparent;
+      border: 1px solid var(--line);
+      color: var(--text);
+      cursor: pointer;
+    }
+    .toggle.on {
+      background: var(--brand);
+      border-color: var(--brand);
+    }
   </style>
   <script src="https://unpkg.com/lucide@latest"></script>
 </head>
@@ -100,7 +114,7 @@ body.locked header .right > *:not(#btnLogin) {
       <div id="plSidebar" class="pl-list"></div>
     </aside>
 
-    <!-- Colonna destra: Player + Files -->
+    <!-- Colonna destra: Player + Files + Schedule -->
     <section class="card">
       <!-- Player “Spotify” -->
       <div class="player">
@@ -119,28 +133,28 @@ body.locked header .right > *:not(#btnLogin) {
             <input id="seekBar" type="range" min="0" max="0" value="0" class="range">
           </div>
 
-<div class="controls">
-  <button id="btnPrev"  class="pill"><i data-lucide="skip-back"></i></button>
+          <div class="controls">
+            <button id="btnPrev"  class="pill"><i data-lucide="skip-back"></i></button>
 
-  <!-- Play/Pause: uno solo visibile per volta; quello visibile è blu -->
-  <button id="btnPlay"  class="pill primary"><i data-lucide="play"></i></button>
-  <button id="btnPause" class="pill" style="display:none"><i data-lucide="pause"></i></button>
+            <!-- Play/Pause: uno solo visibile per volta; quello visibile è blu -->
+            <button id="btnPlay"  class="pill primary"><i data-lucide="play"></i></button>
+            <button id="btnPause" class="pill" style="display:none"><i data-lucide="pause"></i></button>
 
-  <button id="btnStop"  class="pill"><i data-lucide="square"></i></button>
-  <button id="btnNext"  class="pill"><i data-lucide="skip-forward"></i></button>
+            <button id="btnStop"  class="pill"><i data-lucide="square"></i></button>
+            <button id="btnNext"  class="pill"><i data-lucide="skip-forward"></i></button>
 
-  <!-- NUOVO: Loop (repeat brano corrente); quando attivo diventa blu -->
-  <button id="btnLoop"  class="pill" title="Ripeti brano"><i data-lucide="repeat"></i></button>
+            <!-- Loop -->
+            <button id="btnLoop"  class="pill" title="Ripeti brano"><i data-lucide="repeat"></i></button>
 
-  <div class="row" style="margin-left:8px">
-    <small class="muted">Vol</small>
-    <input id="volAbs" type="number" min="0" max="200" value="75" style="width:76px">
-    <button id="btnVolAbs" class="pill">Set</button>
-    <button id="btnVolDown" class="pill">-10</button>
-    <button id="btnVolUp" class="pill">+10</button>
-    <button id="btnClear" class="pill warn">Clear</button>
-  </div>
-</div>
+            <div class="row" style="margin-left:8px">
+              <small class="muted">Vol</small>
+              <input id="volAbs" type="number" min="0" max="200" value="75" style="width:76px">
+              <button id="btnVolAbs" class="pill">Set</button>
+              <button id="btnVolDown" class="pill">-10</button>
+              <button id="btnVolUp" class="pill">+10</button>
+              <button id="btnClear" class="pill warn">Clear</button>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -154,6 +168,17 @@ body.locked header .right > *:not(#btnLogin) {
         </div>
       </div>
       <table class="table" id="r2Table" style="margin-top:8px"></table>
+
+      <!-- SCHEDULE -->
+      <div class="row" style="margin-top:24px;justify-content:space-between">
+        <h3 style="margin:0">Schedule</h3>
+        <div class="row">
+          <button id="btnNewSched" class="pill primary"><i data-lucide="plus-circle"></i> Crea</button>
+          <button id="schReload" class="pill"><i data-lucide="refresh-ccw"></i> Aggiorna</button>
+          <span id="schCount" class="muted"></span>
+        </div>
+      </div>
+      <table class="table" id="schTable" style="margin-top:8px"></table>
     </section>
   </main>
 
@@ -234,6 +259,51 @@ body.locked header .right > *:not(#btnLogin) {
           <button id="plSave" class="pill primary"><i data-lucide="save"></i> Salva & Invia</button>
         </div>
       </div>
+    </div>
+  </div>
+
+  <!-- SCHEDULE MODAL -->
+  <div id="schWrap" class="modal-backdrop">
+    <div class="modal" style="width:min(720px,92vw)">
+      <div class="header">
+        <h3 id="schHdr">Nuova schedulazione</h3>
+        <button id="schClose" class="pill ghost"><i data-lucide="x"></i></button>
+      </div>
+
+      <div class="two-cols">
+        <div>
+          <label class="muted">Ora (24h)</label>
+          <input id="schTime" type="time" step="60" placeholder="HH:MM">
+        </div>
+        <div>
+          <label class="muted">Playlist</label>
+          <select id="schPlSel"></select>
+        </div>
+      </div>
+
+      <div style="margin-top:12px">
+        <label class="muted">Giorni</label>
+        <div class="row">
+          <label><input type="checkbox" class="schDay" value="mon"> Lun</label>
+          <label><input type="checkbox" class="schDay" value="tue"> Mar</label>
+          <label><input type="checkbox" class="schDay" value="wed"> Mer</label>
+          <label><input type="checkbox" class="schDay" value="thu"> Gio</label>
+          <label><input type="checkbox" class="schDay" value="fri"> Ven</label>
+          <label><input type="checkbox" class="schDay" value="sat"> Sab</label>
+          <label><input type="checkbox" class="schDay" value="sun"> Dom</label>
+        </div>
+      </div>
+
+      <div class="row" style="margin-top:12px;justify-content:space-between">
+        <button id="schEnabled" class="toggle on" data-on="1"><i data-lucide="power"></i> ON</button>
+        <div>
+          <button id="schSave" class="pill primary"><i data-lucide="save"></i> Salva</button>
+        </div>
+      </div>
+
+      <small class="muted" style="display:block;margin-top:8px">
+        Timezone: Europe/Rome · In caso di coda attiva, la schedulazione **sostituisce** la riproduzione corrente.
+      </small>
     </div>
   </div>
 
