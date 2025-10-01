@@ -9,15 +9,21 @@ const S = {
   user:    localStorage.getItem("user") || "",
   pass:    localStorage.getItem("pass") || "",
   authed:  false,
-  currentPl: null,
-  plChosen: [],
-  plAvail:  [],
+
+  // Player/State
   timerState: null,
   seeking: false,
-  loopMode: "off" // "off" | "playlist" | "one"
+  loopMode: "off", // "off" | "playlist" | "one"
+
+  // Playlist Editor
+  currentPl: null,     // nome playlist in editing (o null per nuova)
+  plChosen: [],        // array di r2_key nella playlist (ordine)
+  plAvail:  [],        // array di r2_key disponibili (da R2)
+  selAvailIdx: null,   // indice selezionato in "Disponibili"
+  selChosenIdx: null   // indice selezionato in "Tracce nella playlist"
 };
 
-const $ = (q) => document.querySelector(q);
+const $  = (q) => document.querySelector(q);
 const $$ = (q) => document.querySelectorAll(q);
 
 // ====== HELPERS ======
@@ -54,6 +60,10 @@ function setTopStatus(t, ok=true){
   const el = $("#topStatus");
   el.textContent = t;
   el.className = ok ? "ok" : "err";
+}
+function highlightRow(el, on){
+  el.style.background = on ? "#15233b" : "";
+  el.style.borderColor = on ? "#26436f" : "";
 }
 
 // ====== LOGIN MODAL ======
@@ -292,6 +302,201 @@ async function loadPlaylists(){
 }
 $("#btnNewPl").onclick = ()=>{ if(S.authed){ S.currentPl=null; openPlEditor(null); } else openLogin(true); };
 
-// ====== PLAYLIST EDITOR (stessa versione di prima, omessa per brevità) ======
-// ... Se la tua pagina ha l’editor modale già funzionante, lascia quello attuale ...
-// (Se vuoi lo reincollo intero, ma non è toccato per il loop.)
+// ====== PLAYLIST EDITOR (MODALE) ======
+const plWrap = $("#plWrap");
+$("#plClose").onclick = ()=> plWrap.classList.remove("show");
+
+async function openPlEditor(name){
+  if (!S.authed) return openLogin(true);
+
+  $("#plHdr").textContent = name ? `Modifica: ${name}` : "Crea playlist";
+  $("#plNameBox").value = name || "";
+  $("#plDeleteBtn").style.display = name ? "inline-flex" : "none";
+
+  // reset selezioni
+  S.selAvailIdx = null;
+  S.selChosenIdx = null;
+
+  // carica tracce esistenti (se editing)
+  if (name) {
+    const r = await api(`/api/pl/get?name=${encodeURIComponent(name)}`);
+    S.plChosen = (r.tracks||[]).map(t=>t.r2_key);
+  } else {
+    S.plChosen = [];
+  }
+
+  // carica lista disponibili da R2 secondo il prefisso
+  await loadAvailFromR2();
+
+  // mostra modale + render
+  plWrap.classList.add("show");
+  renderPlLists();
+}
+
+async function loadAvailFromR2(){
+  const prefix = $("#plPrefix").value.trim();
+  const r = await api(`/api/files/list?prefix=${encodeURIComponent(prefix)}&limit=1000`);
+  S.plAvail = (r.items||[]).map(x=>x.key);
+}
+
+$("#plReloadFiles").onclick = async ()=>{
+  if (!S.authed) return openLogin(true);
+  await loadAvailFromR2();
+  renderPlLists();
+};
+
+$("#plUploadBtn").onclick = async ()=>{
+  if (!S.authed) return openLogin(true);
+  const f = $("#plUploadFile").files?.[0];
+  if(!f) return alert("Seleziona un file");
+  const prefix = $("#plUploadPrefix").value.trim();
+  const fd = new FormData(); fd.append("file", f, f.name);
+  await api(`/api/files/upload?prefix=${encodeURIComponent(prefix)}`, { method:"POST", body:fd });
+  await loadAvailFromR2(); renderPlLists();
+};
+
+function renderPlLists(){
+  // DISPONIBILI (R2)
+  const availHtml = S.plAvail.map((k,i)=>`
+    <div class="item" data-idx="${i}">
+      <span>${k}</span>
+      <div class="row">
+        <button class="pill primary add" data-idx="${i}">Aggiungi</button>
+      </div>
+    </div>
+  `).join("");
+  $("#plAvail").innerHTML = availHtml || `<div class="muted">Nessun file col prefix dato</div>`;
+
+  // CHOSEN (playlist)
+  const chosenHtml = S.plChosen.map((k,i)=>`
+    <div class="item" data-idx="${i}">
+      <span>${i+1}. ${k}</span>
+      <div class="row">
+        <button class="pill up" data-idx="${i}">Su</button>
+        <button class="pill down" data-idx="${i}">Giù</button>
+        <button class="pill warn rm" data-idx="${i}">✕</button>
+      </div>
+    </div>
+  `).join("");
+  $("#plChosen").innerHTML = chosenHtml || `<div class="muted">Nessuna traccia selezionata</div>`;
+
+  // Selezione righe (per i controlli globali)
+  $$("#plAvail .item").forEach(div=>{
+    const i = parseInt(div.dataset.idx,10);
+    div.onclick = (e)=>{
+      // evita che il click su "Aggiungi" sovrascriva la selezione
+      if (e.target && e.target.classList.contains("add")) return;
+      S.selAvailIdx = i;
+      S.selChosenIdx = null;
+      updateSelections();
+    };
+  });
+  $$("#plChosen .item").forEach(div=>{
+    const i = parseInt(div.dataset.idx,10);
+    div.onclick = ()=>{
+      S.selChosenIdx = i;
+      S.selAvailIdx = null;
+      updateSelections();
+    };
+  });
+
+  // Bottoni per-item
+  $$("#plAvail .add").forEach(btn=>{
+    btn.onclick = ()=>{
+      const i = parseInt(btn.dataset.idx,10);
+      const k = S.plAvail[i];
+      S.plChosen.push(k);
+      renderPlLists();
+    };
+  });
+  $$("#plChosen .rm").forEach(btn=>{
+    btn.onclick = ()=>{
+      const i = parseInt(btn.dataset.idx,10);
+      S.plChosen.splice(i,1);
+      if (S.selChosenIdx === i) S.selChosenIdx = null;
+      renderPlLists();
+    };
+  });
+  $$("#plChosen .up").forEach(btn=>{
+    btn.onclick = ()=>{
+      const i = parseInt(btn.dataset.idx,10);
+      if (i>0){ const t=S.plChosen[i]; S.plChosen[i]=S.plChosen[i-1]; S.plChosen[i-1]=t; }
+      renderPlLists();
+    };
+  });
+  $$("#plChosen .down").forEach(btn=>{
+    btn.onclick = ()=>{
+      const i = parseInt(btn.dataset.idx,10);
+      if (i < S.plChosen.length-1){ const t=S.plChosen[i]; S.plChosen[i]=S.plChosen[i+1]; S.plChosen[i+1]=t; }
+      renderPlLists();
+    };
+  });
+
+  // Controlli GLOBALI (Su / Giù / Rimuovi)
+  $("#plUp").onclick = ()=>{
+    const i = S.selChosenIdx; if (i==null || i<=0) return;
+    const t=S.plChosen[i]; S.plChosen[i]=S.plChosen[i-1]; S.plChosen[i-1]=t;
+    S.selChosenIdx = i-1;
+    renderPlLists();
+  };
+  $("#plDown").onclick = ()=>{
+    const i = S.selChosenIdx; if (i==null || i>=S.plChosen.length-1) return;
+    const t=S.plChosen[i]; S.plChosen[i]=S.plChosen[i+1]; S.plChosen[i+1]=t;
+    S.selChosenIdx = i+1;
+    renderPlLists();
+  };
+  $("#plDelItem").onclick = ()=>{
+    const i = S.selChosenIdx; if (i==null) return;
+    S.plChosen.splice(i,1); S.selChosenIdx = null;
+    renderPlLists();
+  };
+
+  // evidenzia selezioni
+  updateSelections();
+
+  try { lucide.createIcons(); } catch {}
+}
+
+function updateSelections(){
+  // reset
+  $$("#plAvail .item").forEach(div=> highlightRow(div,false));
+  $$("#plChosen .item").forEach(div=> highlightRow(div,false));
+  // highlight selezionati
+  if (S.selAvailIdx!=null){
+    const div = $(`#plAvail .item[data-idx="${S.selAvailIdx}"]`);
+    if (div) highlightRow(div,true);
+  }
+  if (S.selChosenIdx!=null){
+    const div = $(`#plChosen .item[data-idx="${S.selChosenIdx}"]`);
+    if (div) highlightRow(div,true);
+  }
+}
+
+// Salva & invia
+$("#plSave").onclick = async ()=>{
+  if (!S.authed) return openLogin(true);
+  const name = ($("#plNameBox").value || "").trim();
+  if(!name) return alert("Inserisci un nome playlist");
+
+  await api(`/api/pl/create?name=${encodeURIComponent(name)}`, { method:"POST" });
+  const body = S.plChosen.join("\n");
+  await api(`/api/pl/replace?name=${encodeURIComponent(name)}`, { method:"POST", headers:{ "Content-Type":"text/plain" }, body });
+  await api(`/api/pl/send?name=${encodeURIComponent(name)}&device=${encodeURIComponent(S.device)}`, { method:"POST" });
+
+  setTopStatus(`Playlist "${name}" salvata e inviata`, true);
+  plWrap.classList.remove("show");
+  await loadPlaylists();
+};
+
+// Elimina playlist (e clear player)
+$("#plDeleteBtn").onclick = async ()=>{
+  if (!S.authed) return openLogin(true);
+  const name = ($("#plNameBox").value || "").trim();
+  if(!name) return;
+  if(!confirm(`Eliminare la playlist "${name}"?`)) return;
+  await api(`/api/pl/delete?name=${encodeURIComponent(name)}`, { method:"DELETE" });
+  await cmd("clear").catch(()=>{});
+  setTopStatus(`Playlist "${name}" eliminata`, true);
+  plWrap.classList.remove("show");
+  await loadPlaylists();
+};
