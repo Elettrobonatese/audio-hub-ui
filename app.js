@@ -2,6 +2,7 @@
 const DEFAULT_BASE_URL = "https://audio-hub.audio-elettrobonatese-1cf.workers.dev";
 const DEFAULT_DEVICE   = "PC-MainStreet";
 const DEFAULT_TZ       = "Europe/Rome";
+const QUOTA_MB_LIMIT   = 20000; // 20 GB
 
 // ====== STATO APP ======
 const S = {
@@ -16,17 +17,21 @@ const S = {
   seeking: false,
   loopMode: "off", // "off" | "playlist" | "one"
 
+  // Files / Quota
+  r2Items: [],
+  totalBytes: 0,
+
   // Playlist Editor
-  currentPl: null,     // nome playlist in editing (o null per nuova)
-  plChosen: [],        // array di r2_key nella playlist (ordine)
-  plAvail:  [],        // array di r2_key disponibili (da R2)
-  selAvailIdx: null,   // indice selezionato in "Disponibili"
-  selChosenIdx: null,  // indice selezionato in "Tracce nella playlist"
-  playlistsCache: [],  // elenco playlist (per select dello scheduler)
+  currentPl: null,
+  plChosen: [],
+  plAvail:  [],
+  selAvailIdx: null,
+  selChosenIdx: null,
+  playlistsCache: [],
 
   // Scheduler
   schedules: [],
-  schedEditingId: null // id in edit (null = nuova)
+  schedEditingId: null
 };
 
 const $  = (q) => document.querySelector(q);
@@ -81,6 +86,14 @@ function daysToHuman(str){
   return (str||"").split(",").map(x=>map[x]||x).join(", ");
 }
 function pad2(n){ return String(n).padStart(2,"0"); }
+function toMB(bytes){ return (bytes/1024/1024); }
+function fmtMB(bytes){ return `${toMB(bytes).toFixed(2)} MB`; }
+function updateQuotaUi(){
+  const usedMB = toMB(S.totalBytes);
+  const pct = Math.min(100, (usedMB / QUOTA_MB_LIMIT) * 100);
+  $("#quotaText").textContent = `${usedMB.toFixed(2)} / ${QUOTA_MB_LIMIT} MB`;
+  $("#quotaBar").style.width = `${pct}%`;
+}
 
 // ====== LOGIN MODAL ======
 const loginWrap = $("#loginWrap");
@@ -138,9 +151,9 @@ $("#lgPass").addEventListener("keydown", (ev)=>{
 // ====== BOOT ======
 async function bootstrapAfterLogin(){
   if (!S.authed) return;
-  await loadPlaylists();   // popola sidebar + cache playlist
+  await loadPlaylists();
   await listFiles();
-  await loadSchedules();   // carica lista schedulazioni
+  await loadSchedules();
   if(!S.timerState){
     S.timerState = setInterval(refreshState, 1000);
   }
@@ -177,17 +190,17 @@ btnLoop.onclick = async () => {
       await api(`/api/cmd/loop?device=${encodeURIComponent(S.device)}&mode=playlist`, { method:"POST" });
       S.loopMode = "playlist";
     } else if (cur === "playlist") {
-      await api(`/api/cmd/loop?device=${encodeURIComponent(S.device)}&mode=playlist`, { method:"POST" }); // toggle OFF
-      await api(`/api/cmd/loop?device=${encodeURIComponent(S.device)}&mode=one`, { method:"POST" });       // toggle ON
+      await api(`/api/cmd/loop?device=${encodeURIComponent(S.device)}&mode=playlist`, { method:"POST" });
+      await api(`/api/cmd/loop?device=${encodeURIComponent(S.device)}&mode=one`, { method:"POST" });
       S.loopMode = "one";
     } else {
-      await api(`/api/cmd/loop?device=${encodeURIComponent(S.device)}&mode=one`, { method:"POST" });       // toggle OFF
+      await api(`/api/cmd/loop?device=${encodeURIComponent(S.device)}&mode=one`, { method:"POST" });
       S.loopMode = "off";
     }
   } catch (e) {
     console.error(e);
   }
-  updateLoopVisual(S.loopMode); // feedback immediato
+  updateLoopVisual(S.loopMode);
 };
 
 // Seek bar
@@ -204,14 +217,13 @@ seekBar.addEventListener("change", async ()=>{
   S.seeking = false;
 });
 
-// Stato/Now playing (toggle Play/Pausa blu + loop)
+// Stato/Now playing (anche playlist)
 async function refreshState(){
   if (!S.authed) return;
   try{
     const st = await api(`/api/state/get?device=${encodeURIComponent(S.device)}`);
     const info = st?.state || st;
 
-    // stato
     const state = (info?.state || "").toLowerCase();
     const playing = state === "playing";
     const playBtn  = $("#btnPlay");
@@ -228,7 +240,6 @@ async function refreshState(){
       pauseBtn.classList.remove("primary");
     }
 
-    // tempi
     const cur = info?.time ?? 0;
     const len = info?.length ?? Math.max(cur, 0);
     if(!S.seeking){
@@ -238,44 +249,110 @@ async function refreshState(){
     }
     $("#trkState").textContent = `stato: ${state || "—"}`;
 
-    // titolo
     const meta = info?.information?.category?.meta || {};
     const title = meta.title || meta.filename || "—";
     $("#trkTitle").textContent = title;
 
-    // loop flags → tri-stato
-    const repeatOn = !!info?.repeat; // brano
-    const loopOn   = !!info?.loop;   // playlist
+    // playlist corrente (se il Worker/DO la espone)
+    const lastPl = st?.last_playlist || "—";
+    $("#nowPl").textContent = `playlist: ${lastPl}`;
+
+    const repeatOn = !!info?.repeat;
+    const loopOn   = !!info?.loop;
     let mode = "off";
     if (loopOn) mode = "playlist"; else if (repeatOn) mode = "one";
     S.loopMode = mode;
     updateLoopVisual(mode);
-  }catch(e){ /* api 401 ecc. aprono modale */ }
+  }catch(e){ /* 401 → modale già aperta */ }
 }
 
 // ====== FILES (R2) ======
 async function listFiles(){
   if (!S.authed) return;
-  const prefix = $("#r2Prefix").value.trim();
-  const r = await api(`/api/files/list?prefix=${encodeURIComponent(prefix)}&limit=500`);
-  $("#r2Count").textContent = `${r.items.length} oggetti`;
-  const rows = r.items.map(x=>`
+  // lista "tutti" (nessun prefisso), ordina alfabetico
+  const r = await api(`/api/files/list?prefix=&limit=1000`);
+  S.r2Items = (r.items||[]).slice().sort((a,b)=>a.key.localeCompare(b.key, 'it', {sensitivity:'base'}));
+  S.totalBytes = S.r2Items.reduce((acc, x)=>acc + (x.size||0), 0);
+  $("#r2Count").textContent = `${S.r2Items.length} oggetti`;
+  updateQuotaUi();
+
+  const rows = S.r2Items.map(x=>`
     <tr>
       <td>${x.key}</td>
-      <td class="muted">${x.size} B</td>
-      <td><button data-key="${x.key}" class="pill send primary">Enqueue→Device</button></td>
-      <td><button data-key="${x.key}" class="pill warn del">Elimina</button></td>
+      <td class="muted">${fmtMB(x.size)}</td>
+      <td><button data-key="${x.key}" class="pill play primary"><i data-lucide="play"></i> Play</button></td>
+      <td><button data-key="${x.key}" class="pill warn del"><i data-lucide="trash-2"></i> Elimina</button></td>
     </tr>`).join("");
+
   $("#r2Table").innerHTML = `<tr><th>Key</th><th>Size</th><th></th><th></th></tr>${rows}`;
-  $$("#r2Table .send").forEach(b=> b.onclick = ()=> S.authed && api(`/api/cmd/enqueue-r2?device=${encodeURIComponent(S.device)}&r2_key=${encodeURIComponent(b.dataset.key)}`, { method:"POST" }));
+  lucide.createIcons();
+
+  // Play singolo file: clear → enqueue → play
+  $$("#r2Table .play").forEach(b=> b.onclick = async ()=>{
+    if (!S.authed) return openLogin(true);
+    const key = b.dataset.key;
+    await api(`/api/cmd/clear?device=${encodeURIComponent(S.device)}`, { method:"POST" }).catch(()=>{});
+    await api(`/api/cmd/enqueue-r2?device=${encodeURIComponent(S.device)}&r2_key=${encodeURIComponent(key)}`, { method:"POST" });
+    await api(`/api/cmd/play?device=${encodeURIComponent(S.device)}`, { method:"POST" });
+  });
+
+  // Elimina
   $$("#r2Table .del").forEach(b=> b.onclick = async ()=>{
     if (!S.authed) return openLogin(true);
     if(!confirm(`Eliminare ${b.dataset.key}?`)) return;
     await api(`/api/files/delete?r2_key=${encodeURIComponent(b.dataset.key)}`, { method:"DELETE" });
-    listFiles();
+    await listFiles();
   });
 }
 $("#r2List").onclick = ()=> S.authed ? listFiles() : openLogin(true);
+
+// Upload (Files section) — senza prefisso + prefetch sul PC
+$("#filesUploadBtn").onclick = async ()=>{
+  if (!S.authed) return openLogin(true);
+  const f = $("#filesUpload").files?.[0];
+  if (!f) return alert("Seleziona un file");
+  // Controllo quota preventiva
+  const wouldMB = toMB(S.totalBytes + f.size);
+  if (wouldMB > QUOTA_MB_LIMIT) {
+    return alert(`Spazio insufficiente. Caricando "${f.name}" supereresti ${QUOTA_MB_LIMIT} MB.`);
+  }
+  try{
+    const fd = new FormData(); fd.append("file", f, f.name);
+    const up = await api(`/api/files/upload`, { method:"POST", body:fd });
+    const key = up.key || f.name;
+
+    // Prefetch sul device (scarica senza mettere in coda)
+    const ok = await prefetchR2(key);
+    if (!ok) {
+      // se fallisce e l'utente sceglie di non tenere il file, lo eliminiamo
+      await api(`/api/files/delete?r2_key=${encodeURIComponent(key)}`, { method:"DELETE" }).catch(()=>{});
+      throw new Error("Download sul PC non riuscito.");
+    }
+
+    setTopStatus(`Caricato e prefetch: ${key}`, true);
+    $("#filesUpload").value = "";
+    await listFiles();
+  }catch(e){
+    console.error(e);
+    alert(e.message || "Upload/prefetch fallito");
+  }
+};
+
+// helper prefetch con fallback (se Worker non ancora aggiornato)
+async function prefetchR2(key){
+  try{
+    const r = await api(`/api/cmd/prefetch-r2?device=${encodeURIComponent(S.device)}&r2_key=${encodeURIComponent(key)}`, { method:"POST" });
+    // se il Worker risponde ok, assumiamo che l'Agent scarichi
+    return true;
+  }catch(e){
+    if (e?.status === 404) {
+      // Worker non aggiornato: chiedi se tenere comunque il file
+      const keep = confirm("Il Worker non supporta ancora 'prefetch-r2'. Vuoi TENERE comunque il file nel bucket?");
+      return keep; // true = non cancellare; false = cancelleremo il file
+    }
+    return false;
+  }
+}
 
 // ====== PLAYLISTS: SIDEBAR ======
 async function loadPlaylists(){
@@ -328,11 +405,9 @@ async function openPlEditor(name){
   $("#plNameBox").value = name || "";
   $("#plDeleteBtn").style.display = name ? "inline-flex" : "none";
 
-  // reset selezioni
   S.selAvailIdx = null;
   S.selChosenIdx = null;
 
-  // carica tracce esistenti (se editing)
   if (name) {
     const r = await api(`/api/pl/get?name=${encodeURIComponent(name)}`);
     S.plChosen = (r.tracks||[]).map(t=>t.r2_key);
@@ -340,18 +415,14 @@ async function openPlEditor(name){
     S.plChosen = [];
   }
 
-  // carica lista disponibili da R2 secondo il prefisso
   await loadAvailFromR2();
-
-  // mostra modale + render
   plWrap.classList.add("show");
   renderPlLists();
 }
 
 async function loadAvailFromR2(){
-  const prefix = $("#plPrefix").value.trim();
-  const r = await api(`/api/files/list?prefix=${encodeURIComponent(prefix)}&limit=1000`);
-  S.plAvail = (r.items||[]).map(x=>x.key);
+  const r = await api(`/api/files/list?prefix=&limit=1000`);
+  S.plAvail = (r.items||[]).map(x=>x.key).sort((a,b)=>a.localeCompare(b,'it',{sensitivity:'base'}));
 }
 
 $("#plReloadFiles").onclick = async ()=>{
@@ -360,18 +431,40 @@ $("#plReloadFiles").onclick = async ()=>{
   renderPlLists();
 };
 
+// Upload da editor playlist — senza prefisso + prefetch
 $("#plUploadBtn").onclick = async ()=>{
   if (!S.authed) return openLogin(true);
   const f = $("#plUploadFile").files?.[0];
   if(!f) return alert("Seleziona un file");
-  const prefix = $("#plUploadPrefix").value.trim();
-  const fd = new FormData(); fd.append("file", f, f.name);
-  await api(`/api/files/upload?prefix=${encodeURIComponent(prefix)}`, { method:"POST", body:fd });
-  await loadAvailFromR2(); renderPlLists();
+  // quota
+  const wouldMB = toMB(S.totalBytes + f.size);
+  if (wouldMB > QUOTA_MB_LIMIT) {
+    return alert(`Spazio insufficiente. Caricando "${f.name}" supereresti ${QUOTA_MB_LIMIT} MB.`);
+  }
+  try{
+    const fd = new FormData(); fd.append("file", f, f.name);
+    const up = await api(`/api/files/upload`, { method:"POST", body:fd });
+    const key = up.key || f.name;
+
+    const ok = await prefetchR2(key);
+    if (!ok){
+      await api(`/api/files/delete?r2_key=${encodeURIComponent(key)}`, { method:"DELETE" }).catch(()=>{});
+      throw new Error("Download sul PC non riuscito.");
+    }
+
+    $("#plUploadFile").value = "";
+    await listFiles();       // aggiorna quota globale
+    await loadAvailFromR2(); // aggiorna elenco disponibili
+    renderPlLists();
+
+    setTopStatus(`Caricato e prefetch: ${key}`, true);
+  }catch(e){
+    console.error(e);
+    alert(e.message || "Upload/prefetch fallito");
+  }
 };
 
 function renderPlLists(){
-  // DISPONIBILI (R2)
   const availHtml = S.plAvail.map((k,i)=>`
     <div class="item" data-idx="${i}">
       <span>${k}</span>
@@ -380,9 +473,8 @@ function renderPlLists(){
       </div>
     </div>
   `).join("");
-  $("#plAvail").innerHTML = availHtml || `<div class="muted">Nessun file col prefix dato</div>`;
+  $("#plAvail").innerHTML = availHtml || `<div class="muted">Nessun file disponibile</div>`;
 
-  // CHOSEN (playlist)
   const chosenHtml = S.plChosen.map((k,i)=>`
     <div class="item" data-idx="${i}">
       <span>${i+1}. ${k}</span>
@@ -395,7 +487,6 @@ function renderPlLists(){
   `).join("");
   $("#plChosen").innerHTML = chosenHtml || `<div class="muted">Nessuna traccia selezionata</div>`;
 
-  // Selezione righe (per i controlli globali)
   $$("#plAvail .item").forEach(div=>{
     const i = parseInt(div.dataset.idx,10);
     div.onclick = (e)=>{
@@ -414,7 +505,6 @@ function renderPlLists(){
     };
   });
 
-  // Bottoni per-item
   $$("#plAvail .add").forEach(btn=>{
     btn.onclick = ()=>{
       const i = parseInt(btn.dataset.idx,10);
@@ -446,7 +536,6 @@ function renderPlLists(){
     };
   });
 
-  // Controlli GLOBALI (Su / Giù / Rimuovi)
   $("#plUp").onclick = ()=>{
     const i = S.selChosenIdx; if (i==null || i<=0) return;
     const t=S.plChosen[i]; S.plChosen[i]=S.plChosen[i-1]; S.plChosen[i-1]=t;
@@ -465,9 +554,7 @@ function renderPlLists(){
     renderPlLists();
   };
 
-  // evidenzia selezioni
   updateSelections();
-
   try { lucide.createIcons(); } catch {}
 }
 
@@ -484,7 +571,7 @@ function updateSelections(){
   }
 }
 
-// Salva & invia
+// Salva (niente auto-play)
 $("#plSave").onclick = async ()=>{
   if (!S.authed) return openLogin(true);
   const name = ($("#plNameBox").value || "").trim();
@@ -492,10 +579,11 @@ $("#plSave").onclick = async ()=>{
 
   await api(`/api/pl/create?name=${encodeURIComponent(name)}`, { method:"POST" });
   const body = S.plChosen.join("\n");
-  await api(`/api/pl/replace?name=${encodeURIComponent(name)}`, { method:"POST", headers:{ "Content-Type":"text/plain" }, body });
-  await api(`/api/pl/send?name=${encodeURIComponent(name)}&device=${encodeURIComponent(S.device)}`, { method:"POST" });
+  await api(`/api/pl/replace?name=${encodeURIComponent(name)}`, {
+    method:"POST", headers:{ "Content-Type":"text/plain" }, body
+  });
 
-  setTopStatus(`Playlist "${name}" salvata e inviata`, true);
+  setTopStatus(`Playlist "${name}" salvata`, true);
   plWrap.classList.remove("show");
   await loadPlaylists();
 };
@@ -539,17 +627,14 @@ function setDaySelection(daysCsv){
   const set = new Set((daysCsv||"").split(","));
   $$(".schDay").forEach(b=> b.checked = set.has(b.value));
 }
-
 function populatePlSelect(){
   const sel = $("#schPlSel");
   sel.innerHTML = (S.playlistsCache||[]).map(n=>`<option value="${n}">${n}</option>`).join("");
 }
-
 async function openSchModal(id=null){
   if (!S.authed) return openLogin(true);
   S.schedEditingId = id;
 
-  // Assicura la lista playlist popolata
   if (!S.playlistsCache || S.playlistsCache.length===0) {
     await loadPlaylists();
   }
@@ -557,12 +642,11 @@ async function openSchModal(id=null){
 
   if (id==null){
     $("#schHdr").textContent = "Nuova schedulazione";
-    // default: ora prossima tonda (minuto corrente)
     const now = new Date();
     const hh = pad2(now.getHours());
     const mm = pad2(now.getMinutes());
     $("#schTime").value = `${hh}:${mm}`;
-    setDaySelection("mon,tue,wed,thu,fri,sat,sun"); // default: tutti
+    setDaySelection("mon,tue,wed,thu,fri,sat,sun");
     setSchEnabledVisual(true);
   } else {
     $("#schHdr").textContent = `Modifica schedulazione #${id}`;
@@ -590,7 +674,6 @@ $("#schSave").onclick = async ()=>{
   if (!days) return alert("Seleziona almeno un giorno");
   if (!pl) return alert("Seleziona una playlist");
 
-  // dedup client-side: stessa combina (device, tz, hh:mm, days)
   const dupe = S.schedules.find(s =>
     (s.playlist_name===pl) && (s.time_hhmm===hhmm) && (String(s.days)===days)
   );
@@ -601,9 +684,7 @@ $("#schSave").onclick = async ()=>{
 
   try{
     if (S.schedEditingId==null){
-      // Create
       await api(`/api/sched/create?device=${encodeURIComponent(S.device)}&name=${encodeURIComponent(pl)}&time=${encodeURIComponent(hhmm)}&days=${encodeURIComponent(days)}&tz=${encodeURIComponent(DEFAULT_TZ)}`, { method:"POST" });
-      // Se vogliamo disabilitata, toggliamo dopo la creazione
       await loadSchedules();
       if (!wantEnabled){
         const row = S.schedules.find(s => s.playlist_name===pl && s.time_hhmm===hhmm && String(s.days)===days);
@@ -611,7 +692,6 @@ $("#schSave").onclick = async ()=>{
       }
       setTopStatus("Schedulazione creata", true);
     } else {
-      // Edit: non abbiamo API update → facciamo delete + create (+toggle)
       const id = S.schedEditingId;
       await api(`/api/sched/delete?id=${id}`, { method:"DELETE" });
       await api(`/api/sched/create?device=${encodeURIComponent(S.device)}&name=${encodeURIComponent(pl)}&time=${encodeURIComponent(hhmm)}&days=${encodeURIComponent(days)}&tz=${encodeURIComponent(DEFAULT_TZ)}`, { method:"POST" });
@@ -625,7 +705,6 @@ $("#schSave").onclick = async ()=>{
     schWrap.classList.remove("show");
     await loadSchedules();
   }catch(e){
-    // se il Worker un domani risponde 409 per duplicati, mostriamo il messaggio
     alert(e?.data?.reason || e.message || "Errore");
   }
 };
@@ -641,7 +720,6 @@ async function loadSchedules(){
     last_fired_key: x.last_fired_key || null
   }));
 
-  // ordine: ora, giorni, playlist
   S.schedules.sort((a,b)=>{
     if (a.time_hhmm !== b.time_hhmm) return a.time_hhmm.localeCompare(b.time_hhmm);
     if (a.days !== b.days) return a.days.localeCompare(b.days);
@@ -663,7 +741,6 @@ function renderSchedules(){
       <tr data-id="${s.id}">
         <td><strong>${s.time_hhmm}</strong><div>${humanDays}</div></td>
         <td>${s.playlist_name}</td>
-        <td>${s.device}</td>
         <td>${last}</td>
         <td style="white-space:nowrap">
           <button class="pill ${enCls}" data-act="toggle" title="Abilita/Disabilita">${enLabel}</button>
@@ -675,8 +752,8 @@ function renderSchedules(){
   }).join("");
 
   $("#schTable").innerHTML = `
-    <tr><th>Quando</th><th>Playlist</th><th>Device</th><th>Ultimo avvio</th><th>Azioni</th></tr>
-    ${rows || `<tr><td colspan="5"><div class="muted">Nessuna schedulazione</div></td></tr>`}
+    <tr><th>Quando</th><th>Playlist</th><th>Ultimo avvio</th><th>Azioni</th></tr>
+    ${rows || `<tr><td colspan="4"><div class="muted">Nessuna schedulazione</div></td></tr>`}
   `;
 
   lucide.createIcons();
