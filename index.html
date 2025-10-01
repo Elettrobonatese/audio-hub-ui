@@ -64,29 +64,30 @@
       .cover{width:72px;height:72px}
       .two-cols{grid-template-columns:1fr}
     }
-    /* 🔧 Mostra la modale quando la classe 'show' è sul BACKDROP */
+    /* 🔧 Modale on/off */
     .modal-backdrop { display: none; }
     .modal-backdrop.show { display: flex; }
 
-    /* 🔒 Blocca tutta la UI quando non autenticato */
+    /* 🔒 Lock UI se non autenticato */
     body.locked main,
     body.locked header .right > *:not(#btnLogin) {
       pointer-events: none;
       filter: grayscale(1) opacity(0.6);
     }
 
-    /* Toggle ON/OFF stile pill */
-    .toggle {
-      border-radius: 999px;
-      padding: 6px 12px;
-      background: transparent;
-      border: 1px solid var(--line);
-      color: var(--text);
-      cursor: pointer;
+    /* Toggle ON/OFF */
+    .toggle { border-radius: 999px; padding: 6px 12px; background: transparent; border: 1px solid var(--line); color: var(--text); cursor: pointer; }
+    .toggle.on { background: var(--brand); border-color: var(--brand); }
+
+    /* Barra quota */
+    .quota {
+      display:flex; align-items:center; gap:10px; margin-top:6px;
     }
-    .toggle.on {
-      background: var(--brand);
-      border-color: var(--brand);
+    .bar {
+      flex:1; height:8px; background:#0f1a2e; border-radius:999px; overflow:hidden; border:1px solid #1f2a40;
+    }
+    .bar > span {
+      display:block; height:100%; background:var(--brand); width:0%;
     }
   </style>
   <script src="https://unpkg.com/lucide@latest"></script>
@@ -123,6 +124,7 @@
           <div class="track-meta">
             <div id="trkTitle" class="track-title">—</div>
             <div class="muted" id="trkState">stato: —</div>
+            <div class="muted" id="nowPl">playlist: —</div>
           </div>
 
           <div style="margin:10px 0">
@@ -162,11 +164,24 @@
       <div class="row" style="margin-top:18px;justify-content:space-between">
         <h3 style="margin:0">Files (R2)</h3>
         <div class="row">
-          <input id="r2Prefix" placeholder="prefisso es: test/" />
-          <button id="r2List" class="pill">Lista</button>
+          <!-- niente prefisso -->
+          <button id="r2List" class="pill"><i data-lucide="refresh-ccw"></i> Lista</button>
           <span id="r2Count" class="muted"></span>
         </div>
       </div>
+
+      <!-- Quota -->
+      <div class="quota">
+        <div class="bar"><span id="quotaBar"></span></div>
+        <small id="quotaText" class="muted">0 / 20000 MB</small>
+      </div>
+
+      <!-- Upload veloce -->
+      <div class="row" style="margin-top:10px">
+        <input type="file" id="filesUpload" />
+        <button id="filesUploadBtn" class="pill primary"><i data-lucide="upload"></i> Aggiungi file</button>
+      </div>
+
       <table class="table" id="r2Table" style="margin-top:8px"></table>
 
       <!-- SCHEDULE -->
@@ -220,10 +235,6 @@
           <label class="muted">Nome playlist</label>
           <input id="plNameBox" placeholder="Nuova playlist">
         </div>
-        <div>
-          <label class="muted">Prefix R2</label>
-          <input id="plPrefix" placeholder="es: uploads/">
-        </div>
         <div style="align-self:flex-end">
           <button id="plReloadFiles" class="pill">Aggiorna files</button>
         </div>
@@ -236,8 +247,7 @@
 
           <div class="row" style="margin-top:8px">
             <input type="file" id="plUploadFile">
-            <input id="plUploadPrefix" placeholder="uploads/">
-            <button id="plUploadBtn" class="pill primary">Carica</button>
+            <button id="plUploadBtn" class="pill primary">Aggiungi file</button>
           </div>
           <small class="muted">Dopo l’upload il file compare nell’elenco “Disponibili”.</small>
         </div>
@@ -256,7 +266,7 @@
       <div class="row" style="margin-top:12px;justify-content:space-between">
         <button id="plDeleteBtn" class="pill warn"><i data-lucide="trash-2"></i> Elimina playlist</button>
         <div>
-          <button id="plSave" class="pill primary"><i data-lucide="save"></i> Salva & Invia</button>
+          <button id="plSave" class="pill primary"><i data-lucide="save"></i> Salva</button>
         </div>
       </div>
     </div>
@@ -302,7 +312,7 @@
       </div>
 
       <small class="muted" style="display:block;margin-top:8px">
-        Timezone: Europe/Rome · In caso di coda attiva, la schedulazione **sostituisce** la riproduzione corrente.
+        Timezone: Europe/Rome · In caso di coda attiva, la schedulazione <b>sostituisce</b> la riproduzione corrente.
       </small>
     </div>
   </div>
