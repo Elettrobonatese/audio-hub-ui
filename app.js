@@ -8,7 +8,7 @@ const S = {
   device:  DEFAULT_DEVICE,
   user:    localStorage.getItem("user") || "",
   pass:    localStorage.getItem("pass") || "",
-  authed:  false,            // <— stato autenticazione
+  authed:  false,
   currentPl: null,
   plChosen: [],
   plAvail:  [],
@@ -23,13 +23,11 @@ const $$ = (q) => document.querySelectorAll(q);
 function setAuthed(ok){
   S.authed = !!ok;
   document.body.classList.toggle("locked", !S.authed);
-  // bottone in header cambia etichetta
   $("#btnLogin").innerHTML = S.authed
     ? `<i data-lucide="log-out"></i> Logout`
     : `<i data-lucide="log-in"></i> Login`;
   try { lucide.createIcons(); } catch {}
 }
-
 function authHeaders(){
   const tok = btoa(`${S.user}:${S.pass}`);
   return { Authorization: `Basic ${tok}` };
@@ -37,10 +35,9 @@ function authHeaders(){
 async function api(path, {method="GET", headers={}, body}={}){
   const url = S.baseUrl.replace(/\/$/,"") + path;
   const res = await fetch(url, { method, headers: { ...authHeaders(), ...headers }, body });
-  // se 401 → forziamo rilogin e blocco UI
   if (res.status === 401) {
     setAuthed(false);
-    openLogin(true); // forza visibile
+    openLogin(true);
   }
   const txt = await res.text();
   let data = null; try{ data = JSON.parse(txt); }catch{ data = { raw: txt }; }
@@ -65,25 +62,19 @@ function openLogin(force=false){
   $("#lgPass").value = S.pass || "";
   $("#lgInfo").textContent = `Worker: ${S.baseUrl} · Device: ${S.device}`;
   loginWrap.classList.add("show");
-  // blocca UI
   setAuthed(false);
-  // non permettere chiusura finché non authed
   $("#lgClose").style.visibility = S.authed ? "visible" : "hidden";
-  // se ho credenziali salvate e devo auto-login
   if (!S.authed && !force && S.user && S.pass) {
-    // piccolo delay per far disegnare la modale
     setTimeout(() => $("#lgEnter").click(), 50);
   }
 }
 function closeLogin(){
-  if (!S.authed) return; // non chiudere se non autenticato
+  if (!S.authed) return;
   loginWrap.classList.remove("show");
   $("#lgClose").style.visibility = "visible";
 }
-
 $("#btnLogin").onclick = () => {
   if (S.authed) {
-    // Logout
     S.user = ""; S.pass = "";
     localStorage.removeItem("user");
     localStorage.removeItem("pass");
@@ -94,7 +85,6 @@ $("#btnLogin").onclick = () => {
   }
 };
 $("#lgClose").onclick  = closeLogin;
-
 $("#lgEnter").onclick  = async () => {
   S.user = $("#lgUser").value.trim();
   S.pass = $("#lgPass").value;
@@ -110,13 +100,10 @@ $("#lgEnter").onclick  = async () => {
   }catch(e){
     setAuthed(false);
     setTopStatus("Errore login/API", false);
-    // resta aperta; mostro messaggio in modale
     $("#lgInfo").textContent = "Credenziali errate o Worker non raggiungibile.";
     console.error(e);
   }
 };
-
-// Enter per inviare
 $("#lgPass").addEventListener("keydown", (ev)=>{
   if (ev.key === "Enter") $("#lgEnter").click();
 });
@@ -130,11 +117,7 @@ async function bootstrapAfterLogin(){
     S.timerState = setInterval(refreshState, 1000);
   }
 }
-
-// All'apertura: mostra SEMPRE la modale; se ho user/pass salvati provo auto-login
-window.addEventListener("load", () => {
-  openLogin(false);
-});
+window.addEventListener("load", () => { openLogin(false); });
 
 // ====== PLAYER CONTROLS ======
 async function cmd(p){
@@ -148,13 +131,15 @@ $("#btnPrev").onclick  = () => cmd("prev");
 $("#btnNext").onclick  = () => cmd("next");
 $("#btnClear").onclick = () => cmd("clear");
 
-$("#btnVolAbs").onclick = () => {
+// NUOVO: LOOP (ripeti brano corrente)
+const btnLoop = $("#btnLoop");
+btnLoop.onclick = async () => {
   if (!S.authed) return openLogin(true);
-  const v = parseInt($("#volAbs").value||"75",10);
-  return api(`/api/cmd/volume?device=${encodeURIComponent(S.device)}&value=${v}`, { method:"POST" });
+  // toggle lato VLC (pl_repeat) → lo stato aggiornato arriva dallo stream
+  await api(`/api/cmd/loop?device=${encodeURIComponent(S.device)}&mode=one`, { method:"POST" });
+  // piccolo feedback immediato: togglo visivamente, sarà corretto da refreshState al prossimo tick
+  btnLoop.classList.toggle("primary");
 };
-$("#btnVolDown").onclick = () => S.authed && api(`/api/cmd/volume?device=${encodeURIComponent(S.device)}&delta=-10`, { method:"POST" });
-$("#btnVolUp").onclick   = () => S.authed && api(`/api/cmd/volume?device=${encodeURIComponent(S.device)}&delta=+10`, { method:"POST" });
 
 // Seek bar
 const seekBar = $("#seekBar");
@@ -170,24 +155,56 @@ seekBar.addEventListener("change", async ()=>{
   S.seeking = false;
 });
 
-// Stato/Now playing
+// Stato/Now playing (toggle Play/Pause + Loop UI)
 async function refreshState(){
   if (!S.authed) return;
   try{
     const st = await api(`/api/state/get?device=${encodeURIComponent(S.device)}`);
     const info = st?.state || st;
-    const playState = info?.state || "—";
+
+    // Stato riproduzione
+    const state = (info?.state || "").toLowerCase(); // "playing" | "paused" | "stopped"
+    const playing = state === "playing";
+
+    // Toggle pulsanti: mostro SOLO quello corretto, in blu
+    const playBtn  = $("#btnPlay");
+    const pauseBtn = $("#btnPause");
+    if (playing) {
+      playBtn.style.display = "none";
+      pauseBtn.style.display = "inline-flex";
+      pauseBtn.classList.add("primary");
+      playBtn.classList.remove("primary");
+    } else {
+      pauseBtn.style.display = "none";
+      playBtn.style.display = "inline-flex";
+      playBtn.classList.add("primary");
+      pauseBtn.classList.remove("primary");
+    }
+
+    // Tempi e seek
     const cur = info?.time ?? 0;
     const len = info?.length ?? Math.max(cur, 0);
-    $("#trkState").textContent = `stato: ${playState}`;
     if(!S.seeking){
       $("#timeCur").textContent = fmtTime(cur);
       $("#timeTot").textContent = fmtTime(len);
       seekBar.max = len||0; seekBar.value = cur||0;
     }
+    $("#trkState").textContent = `stato: ${state || "—"}`;
+
+    // Titolo
     const meta = info?.information?.category?.meta || {};
     const title = meta.title || meta.filename || "—";
     $("#trkTitle").textContent = title;
+
+    // Loop UI (repeat brano)
+    const repeatOn = !!info?.repeat; // VLC: repeat=true/false per "repeat one"
+    btnLoop.classList.toggle("primary", repeatOn);
+    // cambia icona tra repeat e repeat-1
+    btnLoop.innerHTML = repeatOn
+      ? `<i data-lucide="repeat-1"></i>`
+      : `<i data-lucide="repeat"></i>`;
+    try { lucide.createIcons(); } catch {}
+
   }catch(e){
     // se cade la sessione, api() aprirà la modale
   }
