@@ -1,6 +1,7 @@
 // ====== CONFIG FISSI ======
 const DEFAULT_BASE_URL = "https://audio-hub.audio-elettrobonatese-1cf.workers.dev";
 const DEFAULT_DEVICE   = "PC-MainStreet";
+const DEFAULT_TZ       = "Europe/Rome";
 
 // ====== STATO APP ======
 const S = {
@@ -20,7 +21,12 @@ const S = {
   plChosen: [],        // array di r2_key nella playlist (ordine)
   plAvail:  [],        // array di r2_key disponibili (da R2)
   selAvailIdx: null,   // indice selezionato in "Disponibili"
-  selChosenIdx: null   // indice selezionato in "Tracce nella playlist"
+  selChosenIdx: null,  // indice selezionato in "Tracce nella playlist"
+  playlistsCache: [],  // elenco playlist (per select dello scheduler)
+
+  // Scheduler
+  schedules: [],
+  schedEditingId: null // id in edit (null = nuova)
 };
 
 const $  = (q) => document.querySelector(q);
@@ -65,6 +71,16 @@ function highlightRow(el, on){
   el.style.background = on ? "#15233b" : "";
   el.style.borderColor = on ? "#26436f" : "";
 }
+function normalizeDays(arr){
+  const order = ["mon","tue","wed","thu","fri","sat","sun"];
+  const set = new Set(arr.map(x=>x.toLowerCase()));
+  return order.filter(d=>set.has(d)).join(",");
+}
+function daysToHuman(str){
+  const map = {mon:"Lun",tue:"Mar",wed:"Mer",thu:"Gio",fri:"Ven",sat:"Sab",sun:"Dom"};
+  return (str||"").split(",").map(x=>map[x]||x).join(", ");
+}
+function pad2(n){ return String(n).padStart(2,"0"); }
 
 // ====== LOGIN MODAL ======
 const loginWrap = $("#loginWrap");
@@ -122,8 +138,9 @@ $("#lgPass").addEventListener("keydown", (ev)=>{
 // ====== BOOT ======
 async function bootstrapAfterLogin(){
   if (!S.authed) return;
-  await loadPlaylists();
+  await loadPlaylists();   // popola sidebar + cache playlist
   await listFiles();
+  await loadSchedules();   // carica lista schedulazioni
   if(!S.timerState){
     S.timerState = setInterval(refreshState, 1000);
   }
@@ -157,16 +174,13 @@ btnLoop.onclick = async () => {
   const cur = S.loopMode;
   try {
     if (cur === "off") {
-      // OFF → PLAYLIST (accendi pl_loop)
       await api(`/api/cmd/loop?device=${encodeURIComponent(S.device)}&mode=playlist`, { method:"POST" });
       S.loopMode = "playlist";
     } else if (cur === "playlist") {
-      // PLAYLIST → ONE (spegni pl_loop, accendi pl_repeat)
       await api(`/api/cmd/loop?device=${encodeURIComponent(S.device)}&mode=playlist`, { method:"POST" }); // toggle OFF
       await api(`/api/cmd/loop?device=${encodeURIComponent(S.device)}&mode=one`, { method:"POST" });       // toggle ON
       S.loopMode = "one";
     } else {
-      // ONE → OFF (spegni pl_repeat)
       await api(`/api/cmd/loop?device=${encodeURIComponent(S.device)}&mode=one`, { method:"POST" });       // toggle OFF
       S.loopMode = "off";
     }
@@ -267,6 +281,7 @@ $("#r2List").onclick = ()=> S.authed ? listFiles() : openLogin(true);
 async function loadPlaylists(){
   if (!S.authed) return;
   const r = await api("/api/pl/list");
+  S.playlistsCache = (r.playlists||[]).map(p=>p.name);
   const items = (r.playlists||[]).map(p=>`
     <div class="pl-item">
       <div>
@@ -384,7 +399,6 @@ function renderPlLists(){
   $$("#plAvail .item").forEach(div=>{
     const i = parseInt(div.dataset.idx,10);
     div.onclick = (e)=>{
-      // evita che il click su "Aggiungi" sovrascriva la selezione
       if (e.target && e.target.classList.contains("add")) return;
       S.selAvailIdx = i;
       S.selChosenIdx = null;
@@ -458,10 +472,8 @@ function renderPlLists(){
 }
 
 function updateSelections(){
-  // reset
   $$("#plAvail .item").forEach(div=> highlightRow(div,false));
   $$("#plChosen .item").forEach(div=> highlightRow(div,false));
-  // highlight selezionati
   if (S.selAvailIdx!=null){
     const div = $(`#plAvail .item[data-idx="${S.selAvailIdx}"]`);
     if (div) highlightRow(div,true);
@@ -500,3 +512,206 @@ $("#plDeleteBtn").onclick = async ()=>{
   plWrap.classList.remove("show");
   await loadPlaylists();
 };
+
+// ====== SCHEDULE (UI) ======
+const schWrap = $("#schWrap");
+const schEnabledBtn = $("#schEnabled");
+
+function setSchEnabledVisual(on){
+  schEnabledBtn.classList.toggle("on", !!on);
+  schEnabledBtn.dataset.on = on ? "1" : "0";
+  schEnabledBtn.innerHTML = on
+    ? `<i data-lucide="power"></i> ON`
+    : `<i data-lucide="power"></i> OFF`;
+  try { lucide.createIcons(); } catch {}
+}
+schEnabledBtn.onclick = ()=>{
+  const on = schEnabledBtn.dataset.on === "1";
+  setSchEnabledVisual(!on);
+};
+
+function getDaySelection(){
+  const boxes = $$(".schDay");
+  const sel = Array.from(boxes).filter(b=>b.checked).map(b=>b.value);
+  return normalizeDays(sel);
+}
+function setDaySelection(daysCsv){
+  const set = new Set((daysCsv||"").split(","));
+  $$(".schDay").forEach(b=> b.checked = set.has(b.value));
+}
+
+function populatePlSelect(){
+  const sel = $("#schPlSel");
+  sel.innerHTML = (S.playlistsCache||[]).map(n=>`<option value="${n}">${n}</option>`).join("");
+}
+
+async function openSchModal(id=null){
+  if (!S.authed) return openLogin(true);
+  S.schedEditingId = id;
+
+  // Assicura la lista playlist popolata
+  if (!S.playlistsCache || S.playlistsCache.length===0) {
+    await loadPlaylists();
+  }
+  populatePlSelect();
+
+  if (id==null){
+    $("#schHdr").textContent = "Nuova schedulazione";
+    // default: ora prossima tonda (minuto corrente)
+    const now = new Date();
+    const hh = pad2(now.getHours());
+    const mm = pad2(now.getMinutes());
+    $("#schTime").value = `${hh}:${mm}`;
+    setDaySelection("mon,tue,wed,thu,fri,sat,sun"); // default: tutti
+    setSchEnabledVisual(true);
+  } else {
+    $("#schHdr").textContent = `Modifica schedulazione #${id}`;
+    const row = S.schedules.find(x=>x.id===id);
+    if (!row) { alert("Schedulazione non trovata"); return; }
+    $("#schTime").value = row.time_hhmm;
+    setDaySelection(row.days || "");
+    $("#schPlSel").value = row.playlist_name;
+    setSchEnabledVisual(!!row.enabled);
+  }
+
+  schWrap.classList.add("show");
+}
+$("#schClose").onclick = ()=> schWrap.classList.remove("show");
+$("#btnNewSched").onclick = ()=> openSchModal(null);
+
+$("#schSave").onclick = async ()=>{
+  if (!S.authed) return openLogin(true);
+  const hhmm = ($("#schTime").value || "").trim();
+  const days = getDaySelection();
+  const pl   = $("#schPlSel").value;
+  const wantEnabled = $("#schEnabled").dataset.on === "1";
+
+  if (!/^\d\d:\d\d$/.test(hhmm)) return alert("Inserisci un orario HH:MM");
+  if (!days) return alert("Seleziona almeno un giorno");
+  if (!pl) return alert("Seleziona una playlist");
+
+  // dedup client-side: stessa combina (device, tz, hh:mm, days)
+  const dupe = S.schedules.find(s =>
+    (s.playlist_name===pl) && (s.time_hhmm===hhmm) && (String(s.days)===days)
+  );
+  if (S.schedEditingId==null && dupe){
+    alert("Esiste già una schedulazione per questi giorni e quest’ora con la stessa playlist.");
+    return;
+  }
+
+  try{
+    if (S.schedEditingId==null){
+      // Create
+      await api(`/api/sched/create?device=${encodeURIComponent(S.device)}&name=${encodeURIComponent(pl)}&time=${encodeURIComponent(hhmm)}&days=${encodeURIComponent(days)}&tz=${encodeURIComponent(DEFAULT_TZ)}`, { method:"POST" });
+      // Se vogliamo disabilitata, toggliamo dopo la creazione
+      await loadSchedules();
+      if (!wantEnabled){
+        const row = S.schedules.find(s => s.playlist_name===pl && s.time_hhmm===hhmm && String(s.days)===days);
+        if (row){ await api(`/api/sched/toggle?id=${row.id}&enabled=0`, { method:"POST" }); }
+      }
+      setTopStatus("Schedulazione creata", true);
+    } else {
+      // Edit: non abbiamo API update → facciamo delete + create (+toggle)
+      const id = S.schedEditingId;
+      await api(`/api/sched/delete?id=${id}`, { method:"DELETE" });
+      await api(`/api/sched/create?device=${encodeURIComponent(S.device)}&name=${encodeURIComponent(pl)}&time=${encodeURIComponent(hhmm)}&days=${encodeURIComponent(days)}&tz=${encodeURIComponent(DEFAULT_TZ)}`, { method:"POST" });
+      await loadSchedules();
+      if (!wantEnabled){
+        const row = S.schedules.find(s => s.playlist_name===pl && s.time_hhmm===hhmm && String(s.days)===days);
+        if (row){ await api(`/api/sched/toggle?id=${row.id}&enabled=0`, { method:"POST" }); }
+      }
+      setTopStatus("Schedulazione aggiornata", true);
+    }
+    schWrap.classList.remove("show");
+    await loadSchedules();
+  }catch(e){
+    // se il Worker un domani risponde 409 per duplicati, mostriamo il messaggio
+    alert(e?.data?.reason || e.message || "Errore");
+  }
+};
+
+$("#schReload").onclick = ()=> S.authed ? loadSchedules() : openLogin(true);
+
+async function loadSchedules(){
+  if (!S.authed) return;
+  const r = await api(`/api/sched/list`);
+  S.schedules = (r.schedules || []).map(x=>({
+    id:x.id, device:x.device, playlist_name:x.playlist_name,
+    tz:x.tz, time_hhmm:x.time_hhmm, days:x.days, enabled:!!x.enabled,
+    last_fired_key: x.last_fired_key || null
+  }));
+
+  // ordine: ora, giorni, playlist
+  S.schedules.sort((a,b)=>{
+    if (a.time_hhmm !== b.time_hhmm) return a.time_hhmm.localeCompare(b.time_hhmm);
+    if (a.days !== b.days) return a.days.localeCompare(b.days);
+    return a.playlist_name.localeCompare(b.playlist_name);
+  });
+
+  renderSchedules();
+}
+
+function renderSchedules(){
+  $("#schCount").textContent = `${S.schedules.length} regole`;
+
+  const rows = S.schedules.map(s=>{
+    const humanDays = daysToHuman(s.days);
+    const enCls = s.enabled ? "primary" : "";
+    const enLabel = s.enabled ? "ON" : "OFF";
+    const last = s.last_fired_key ? `<small class="muted">${s.last_fired_key}</small>` : `<small class="muted">—</small>`;
+    return `
+      <tr data-id="${s.id}">
+        <td><strong>${s.time_hhmm}</strong><div>${humanDays}</div></td>
+        <td>${s.playlist_name}</td>
+        <td>${s.device}</td>
+        <td>${last}</td>
+        <td style="white-space:nowrap">
+          <button class="pill ${enCls}" data-act="toggle" title="Abilita/Disabilita">${enLabel}</button>
+          <button class="pill" data-act="run"><i data-lucide="play-circle"></i></button>
+          <button class="pill" data-act="edit"><i data-lucide="pencil"></i></button>
+          <button class="pill warn" data-act="del"><i data-lucide="trash-2"></i></button>
+        </td>
+      </tr>`;
+  }).join("");
+
+  $("#schTable").innerHTML = `
+    <tr><th>Quando</th><th>Playlist</th><th>Device</th><th>Ultimo avvio</th><th>Azioni</th></tr>
+    ${rows || `<tr><td colspan="5"><div class="muted">Nessuna schedulazione</div></td></tr>`}
+  `;
+
+  lucide.createIcons();
+
+  $$("#schTable tr[data-id]").forEach(tr=>{
+    const id = parseInt(tr.dataset.id,10);
+    tr.querySelectorAll("[data-act]").forEach(btn=>{
+      const act = btn.dataset.act;
+      btn.onclick = async ()=>{
+        if (!S.authed) return openLogin(true);
+        const row = S.schedules.find(x=>x.id===id);
+        if (!row) return;
+
+        if (act === "toggle"){
+          const want = row.enabled ? 0 : 1;
+          const msg = want ? "Attivare questa schedulazione?" : "Disattivare questa schedulazione?";
+          if (!confirm(msg)) return;
+          await api(`/api/sched/toggle?id=${id}&enabled=${want}`, { method:"POST" });
+          await loadSchedules();
+          setTopStatus(`Schedulazione ${want ? "attivata" : "disattivata"}`, true);
+        }
+        else if (act === "edit"){
+          await openSchModal(id);
+        }
+        else if (act === "del"){
+          if (!confirm("Eliminare questa schedulazione?")) return;
+          await api(`/api/sched/delete?id=${id}`, { method:"DELETE" });
+          await loadSchedules();
+          setTopStatus("Schedulazione eliminata", true);
+        }
+        else if (act === "run"){
+          await api(`/api/sched/run-now?id=${id}`, { method:"POST" });
+          setTopStatus("Avviata ora", true);
+        }
+      };
+    });
+  });
+}
