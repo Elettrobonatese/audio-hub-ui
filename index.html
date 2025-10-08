@@ -349,6 +349,174 @@
       .pill { padding:6px 10px; }
       .modal .header h3 { font-size:1.1rem; }
     }
+	
+	/* --- MOBILE RESPONSIVE FIX --- */
+
+/* Impedisci lo sbordamento globale */
+html, body {
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+/* Rende immagini, video e iframe sempre contenuti */
+img, video, iframe {
+  max-width: 100%;
+  height: auto;
+  display: block;
+}
+
+/* Contenitori principali fluidi */
+main, section, .container, .card {
+  width: 100%;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+/* Breakpoint tablet */
+@media (max-width: 768px) {
+
+  body {
+    font-size: 15px;
+    line-height: 1.5;
+    overflow-x: hidden;
+  }
+
+  header {
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 10px 14px;
+  }
+
+  header .brand {
+    font-size: 1rem;
+  }
+
+  main {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    padding: 12px;
+  }
+
+  /* Sidebar e player */
+  .sidebar {
+    order: 2;
+    width: 100%;
+    max-width: 100%;
+  }
+
+  .player {
+    order: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+  }
+
+  .cover {
+    width: 140px;
+    height: 140px;
+    margin: 0 auto 10px;
+    border-radius: 10px;
+    object-fit: cover;
+  }
+
+  .controls {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 8px;
+    width: 100%;
+  }
+
+  .controls button {
+    flex: 1 1 30%;
+    max-width: 140px;
+  }
+
+  /* Tabelle scrollabili */
+  .table,
+  table {
+    display: block;
+    width: 100%;
+    overflow-x: auto;
+    white-space: nowrap;
+  }
+
+  /* Input e pulsanti fluidi */
+  input,
+  select,
+  textarea,
+  button {
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
+  }
+
+  /* Modali adattive */
+  .modal {
+    width: 96vw !important;
+    height: auto !important;
+    max-height: 90vh;
+    border-radius: 12px;
+    overflow-y: auto;
+    padding: 16px;
+    box-sizing: border-box;
+  }
+
+  .modal .header h3 {
+    font-size: 1.1rem;
+  }
+
+  /* Layout a colonna */
+  .row, .two-cols {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .listbox {
+    height: auto;
+    max-height: 250px;
+  }
+
+  .quota {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .pill {
+    padding: 6px 10px;
+    font-size: 0.9rem;
+  }
+
+  /* Rimuove margini indesiderati */
+  * {
+    box-sizing: border-box;
+  }
+}
+
+/* Breakpoint extra piccolo */
+@media (max-width: 480px) {
+  header .brand svg {
+    display: none;
+  }
+
+  .track-title {
+    font-size: 1rem;
+  }
+
+  .controls button {
+    font-size: 0.9rem;
+    padding: 8px;
+  }
+
+  .modal {
+    padding: 12px;
+  }
+}
+
   </style>
 
   <script src="https://unpkg.com/lucide@latest"></script>
