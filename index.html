@@ -5,97 +5,362 @@
   <title>Audio Hub Control</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <style>
-    :root{
-      --bg:#0b0f14; --panel:#0f172a; --panel-2:#111827; --line:#1f2937; --text:#e6edf3; --muted:#9ca3af; --brand:#2563eb; --warn:#7c2d12;
+    :root {
+      --bg:#0b0f14;
+      --panel:#0f172a;
+      --panel-2:#111827;
+      --line:#1f2937;
+      --text:#e6edf3;
+      --muted:#9ca3af;
+      --brand:#2563eb;
+      --warn:#7c2d12;
     }
-    *{box-sizing:border-box}
-    body{margin:0;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
-    header{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 16px;background:var(--panel-2);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:5}
-    header .brand{display:flex;gap:8px;align-items:center;font-weight:700}
-    header .right{display:flex;gap:8px;align-items:center}
-    main{display:grid;grid-template-columns:280px 1fr;gap:16px;padding:16px}
-    .card{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:16px;box-shadow:0 10px 20px rgb(0 0 0 / .2)}
-    .muted{color:var(--muted)}
 
-    button,input,select,textarea{background:var(--panel-2);color:var(--text);border:1px solid var(--line);border-radius:10px;padding:8px 12px}
-    button{cursor:pointer;transition:.15s transform,.15s opacity;display:inline-flex;align-items:center;gap:8px}
-    button:hover{transform:translateY(-1px);opacity:.95}
-    button:active{transform:translateY(0);opacity:.9}
-    .btn{padding:8px 12px}
-    .primary{background:var(--brand);border-color:var(--brand)}
-    .warn{background:var(--warn);border-color:var(--warn)}
-    .ghost{background:transparent}
-    .pill{border-radius:999px;padding:6px 10px}
-    .ok{color:#22c55e}.err{color:#ef4444}
+    * { box-sizing:border-box; }
+
+    body {
+      margin:0;
+      background:var(--bg);
+      color:var(--text);
+      font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
+    }
+
+    header {
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:12px;
+      padding:14px 16px;
+      background:var(--panel-2);
+      border-bottom:1px solid var(--line);
+      position:sticky;
+      top:0;
+      z-index:5;
+      flex-wrap:wrap;
+    }
+
+    header .brand {
+      display:flex;
+      gap:8px;
+      align-items:center;
+      font-weight:700;
+    }
+
+    header .right {
+      display:flex;
+      gap:8px;
+      align-items:center;
+      flex-wrap:wrap;
+    }
+
+    main {
+      display:grid;
+      grid-template-columns:280px 1fr;
+      gap:16px;
+      padding:16px;
+    }
+
+    .card {
+      background:var(--panel);
+      border:1px solid var(--line);
+      border-radius:16px;
+      padding:16px;
+      box-shadow:0 10px 20px rgb(0 0 0 / .2);
+    }
+
+    .muted { color:var(--muted); }
+
+    button, input, select, textarea {
+      background:var(--panel-2);
+      color:var(--text);
+      border:1px solid var(--line);
+      border-radius:10px;
+      padding:8px 12px;
+    }
+
+    button {
+      cursor:pointer;
+      transition:.15s transform,.15s opacity;
+      display:inline-flex;
+      align-items:center;
+      gap:8px;
+    }
+
+    button:hover { transform:translateY(-1px); opacity:.95; }
+    button:active { transform:translateY(0); opacity:.9; }
+
+    .btn { padding:8px 12px; }
+    .primary { background:var(--brand); border-color:var(--brand); }
+    .warn { background:var(--warn); border-color:var(--warn); }
+    .ghost { background:transparent; }
+    .pill { border-radius:999px; padding:6px 10px; }
+    .ok { color:#22c55e; }
+    .err { color:#ef4444; }
 
     /* Sidebar playlists */
-    .sidebar h3{margin:0 0 8px}
-    .pl-list{display:flex;flex-direction:column;gap:8px;max-height:60vh;overflow:auto}
-    .pl-item{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:10px;border:1px solid var(--line);border-radius:10px}
-    .pl-item .name{font-weight:600}
-    .pl-item small{color:var(--muted)}
+    .sidebar h3 { margin:0 0 8px; }
+    .pl-list {
+      display:flex;
+      flex-direction:column;
+      gap:8px;
+      max-height:60vh;
+      overflow:auto;
+    }
+    .pl-item {
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:8px;
+      padding:10px;
+      border:1px solid var(--line);
+      border-radius:10px;
+    }
+    .pl-item .name { font-weight:600; }
+    .pl-item small { color:var(--muted); }
 
     /* Player stile Spotify */
-    .player{display:grid;grid-template-columns:100px 1fr;gap:16px;align-items:center}
-    .cover{width:100px;height:100px;border-radius:10px;background:#0b1220;border:1px solid var(--line);display:flex;align-items:center;justify-content:center;font-weight:700;color:#94a3b8}
-    .track-meta{display:flex;flex-direction:column;gap:4px}
-    .track-title{font-weight:700}
-    .controls{display:flex;align-items:center;gap:8px;margin-top:8px;flex-wrap:wrap}
-    .range{appearance:none;width:100%;height:6px;background:#0f1a2e;border-radius:999px;outline:none}
-    .row{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
-    .split{display:grid;grid-template-columns:1fr 1fr;gap:16px}
-    .table{width:100%;border-collapse:collapse}
-    .table th,.table td{border-bottom:1px solid var(--line);padding:8px;text-align:left}
-    .table th{color:var(--muted);font-weight:600}
+    .player {
+      display:grid;
+      grid-template-columns:100px 1fr;
+      gap:16px;
+      align-items:center;
+    }
+
+    .cover {
+      width:100px;
+      height:100px;
+      border-radius:10px;
+      background:#0b1220;
+      border:1px solid var(--line);
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      font-weight:700;
+      color:#94a3b8;
+    }
+
+    .track-meta {
+      display:flex;
+      flex-direction:column;
+      gap:4px;
+    }
+
+    .track-title { font-weight:700; }
+    .controls {
+      display:flex;
+      align-items:center;
+      gap:8px;
+      margin-top:8px;
+      flex-wrap:wrap;
+    }
+
+    .range {
+      appearance:none;
+      width:100%;
+      height:6px;
+      background:#0f1a2e;
+      border-radius:999px;
+      outline:none;
+    }
+
+    .row {
+      display:flex;
+      align-items:center;
+      gap:8px;
+      flex-wrap:wrap;
+    }
+
+    .split { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+
+    .table {
+      width:100%;
+      border-collapse:collapse;
+    }
+
+    .table th, .table td {
+      border-bottom:1px solid var(--line);
+      padding:8px;
+      text-align:left;
+    }
+
+    .table th { color:var(--muted); font-weight:600; }
 
     /* Modals */
-    .modal-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.55);display:none;align-items:center;justify-content:center;z-index:50}
-    .modal{width:min(780px,92vw);max-height:86vh;overflow:auto;background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:16px;box-shadow:0 20px 40px rgba(0,0,0,.45)}
-    .modal.show{display:flex}
-    .modal .header{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
-    .two-cols{display:grid;grid-template-columns:1fr 1fr;gap:12px}
-    .listbox{border:1px solid var(--line);border-radius:10px;padding:8px;height:320px;overflow:auto;background:var(--panel-2)}
-    .item{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:6px;border-bottom:1px solid #1a2436}
-    .item:last-child{border-bottom:none}
-
-    @media (max-width: 980px){
-      main{grid-template-columns:1fr}
-      .player{grid-template-columns:72px 1fr}
-      .cover{width:72px;height:72px}
-      .two-cols{grid-template-columns:1fr}
+    .modal-backdrop {
+      position:fixed;
+      inset:0;
+      background:rgba(0,0,0,.55);
+      display:none;
+      align-items:center;
+      justify-content:center;
+      z-index:50;
     }
-    /* 🔧 Modale on/off */
-    .modal-backdrop { display: none; }
-    .modal-backdrop.show { display: flex; }
 
-    /* 🔒 Lock UI se non autenticato */
+    .modal {
+      width:min(780px,92vw);
+      max-height:86vh;
+      overflow:auto;
+      background:var(--panel);
+      border:1px solid var(--line);
+      border-radius:16px;
+      padding:16px;
+      box-shadow:0 20px 40px rgba(0,0,0,.45);
+    }
+
+    .modal.show { display:flex; }
+    .modal .header { display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; }
+    .two-cols { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+
+    .listbox {
+      border:1px solid var(--line);
+      border-radius:10px;
+      padding:8px;
+      height:320px;
+      overflow:auto;
+      background:var(--panel-2);
+    }
+
+    .item {
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:8px;
+      padding:6px;
+      border-bottom:1px solid #1a2436;
+    }
+    .item:last-child { border-bottom:none; }
+
+    /* Lock UI se non autenticato */
     body.locked main,
     body.locked header .right > *:not(#btnLogin) {
-      pointer-events: none;
-      filter: grayscale(1) opacity(0.6);
+      pointer-events:none;
+      filter:grayscale(1) opacity(0.6);
     }
 
     /* Toggle ON/OFF */
-    .toggle { border-radius: 999px; padding: 6px 12px; background: transparent; border: 1px solid var(--line); color: var(--text); cursor: pointer; }
-    .toggle.on { background: var(--brand); border-color: var(--brand); }
+    .toggle {
+      border-radius:999px;
+      padding:6px 12px;
+      background:transparent;
+      border:1px solid var(--line);
+      color:var(--text);
+      cursor:pointer;
+    }
+    .toggle.on {
+      background:var(--brand);
+      border-color:var(--brand);
+    }
 
     /* Barra quota */
     .quota {
-      display:flex; align-items:center; gap:10px; margin-top:6px;
+      display:flex;
+      align-items:center;
+      gap:10px;
+      margin-top:6px;
     }
     .bar {
-      flex:1; height:8px; background:#0f1a2e; border-radius:999px; overflow:hidden; border:1px solid #1f2a40;
+      flex:1;
+      height:8px;
+      background:#0f1a2e;
+      border-radius:999px;
+      overflow:hidden;
+      border:1px solid #1f2a40;
     }
     .bar > span {
-      display:block; height:100%; background:var(--brand); width:0%;
+      display:block;
+      height:100%;
+      background:var(--brand);
+      width:0%;
+    }
+
+    /* 📱 --- MOBILE FRIENDLY --- */
+    @media (max-width: 768px) {
+      body { font-size:15px; }
+
+      main {
+        grid-template-columns:1fr;
+        padding:12px;
+        gap:12px;
+      }
+
+      .card { padding:12px; border-radius:12px; }
+
+      /* Sidebar sotto al player */
+      .sidebar { order:2; max-height:none; }
+      .pl-list { max-height:none; }
+
+      /* Player verticale */
+      .player { grid-template-columns:1fr; text-align:center; }
+      .cover { margin:0 auto; width:120px; height:120px; }
+
+      .controls {
+        justify-content:center;
+        flex-wrap:wrap;
+      }
+
+      .controls button {
+        flex:1 1 30%;
+        justify-content:center;
+      }
+
+      /* Tabelle scrollabili */
+      .table {
+        display:block;
+        overflow-x:auto;
+        white-space:nowrap;
+        font-size:14px;
+      }
+
+      /* Input/pulsanti full width */
+      input[type="file"],
+      input[type="text"],
+      input[type="number"],
+      input[type="password"],
+      select,
+      button {
+        width:100%;
+        max-width:100%;
+      }
+
+      .row { flex-wrap:wrap; }
+
+      /* Modali full-screen */
+      .modal {
+        width:96vw;
+        height:90vh;
+        max-height:none;
+        border-radius:12px;
+        padding:14px;
+      }
+
+      .two-cols { grid-template-columns:1fr; }
+      .listbox { height:200px; }
+      .toggle { flex:1; text-align:center; }
+
+      .quota {
+        flex-direction:column;
+        align-items:stretch;
+      }
+    }
+
+    @media (max-width:480px) {
+      header .brand svg { display:none; }
+      .track-title { font-size:1rem; }
+      .pill { padding:6px 10px; }
+      .modal .header h3 { font-size:1.1rem; }
     }
   </style>
+
   <script src="https://unpkg.com/lucide@latest"></script>
 </head>
+
 <body>
+  <!-- HEADER -->
   <header>
     <div class="brand">
-      <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M5 3v18l7-5 7 5V3" stroke="#60a5fa" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+        <path d="M5 3v18l7-5 7 5V3" stroke="#60a5fa" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
       Audio Hub
       <span class="muted">· control</span>
     </div>
@@ -105,8 +370,8 @@
     </div>
   </header>
 
+  <!-- MAIN -->
   <main>
-    <!-- Sidebar playlists -->
     <aside class="card sidebar">
       <div class="row" style="justify-content:space-between">
         <h3>Playlist</h3>
@@ -115,9 +380,7 @@
       <div id="plSidebar" class="pl-list"></div>
     </aside>
 
-    <!-- Colonna destra: Player + Files + Schedule -->
     <section class="card">
-      <!-- Player “Spotify” -->
       <div class="player">
         <div class="cover" id="cover">♫</div>
         <div>
@@ -136,17 +399,12 @@
           </div>
 
           <div class="controls">
-            <button id="btnPrev"  class="pill"><i data-lucide="skip-back"></i></button>
-
-            <!-- Play/Pause: uno solo visibile per volta; quello visibile è blu -->
-            <button id="btnPlay"  class="pill primary"><i data-lucide="play"></i></button>
+            <button id="btnPrev" class="pill"><i data-lucide="skip-back"></i></button>
+            <button id="btnPlay" class="pill primary"><i data-lucide="play"></i></button>
             <button id="btnPause" class="pill" style="display:none"><i data-lucide="pause"></i></button>
-
-            <button id="btnStop"  class="pill"><i data-lucide="square"></i></button>
-            <button id="btnNext"  class="pill"><i data-lucide="skip-forward"></i></button>
-
-            <!-- Loop -->
-            <button id="btnLoop"  class="pill" title="Ripeti brano"><i data-lucide="repeat"></i></button>
+            <button id="btnStop" class="pill"><i data-lucide="square"></i></button>
+            <button id="btnNext" class="pill"><i data-lucide="skip-forward"></i></button>
+            <button id="btnLoop" class="pill" title="Ripeti brano"><i data-lucide="repeat"></i></button>
 
             <div class="row" style="margin-left:8px">
               <small class="muted">Vol</small>
@@ -160,23 +418,19 @@
         </div>
       </div>
 
-      <!-- Files R2 -->
       <div class="row" style="margin-top:18px;justify-content:space-between">
         <h3 style="margin:0">Files (R2)</h3>
         <div class="row">
-          <!-- niente prefisso -->
           <button id="r2List" class="pill"><i data-lucide="refresh-ccw"></i> Lista</button>
           <span id="r2Count" class="muted"></span>
         </div>
       </div>
 
-      <!-- Quota -->
       <div class="quota">
         <div class="bar"><span id="quotaBar"></span></div>
         <small id="quotaText" class="muted">0 / 20000 MB</small>
       </div>
 
-      <!-- Upload veloce -->
       <div class="row" style="margin-top:10px">
         <input type="file" id="filesUpload" />
         <button id="filesUploadBtn" class="pill primary"><i data-lucide="upload"></i> Aggiungi file</button>
@@ -184,7 +438,6 @@
 
       <table class="table" id="r2Table" style="margin-top:8px"></table>
 
-      <!-- SCHEDULE -->
       <div class="row" style="margin-top:24px;justify-content:space-between">
         <h3 style="margin:0">Schedule</h3>
         <div class="row">
@@ -193,11 +446,12 @@
           <span id="schCount" class="muted"></span>
         </div>
       </div>
+
       <table class="table" id="schTable" style="margin-top:8px"></table>
     </section>
   </main>
 
-  <!-- LOGIN MODAL -->
+  <!-- Modali -->
   <div id="loginWrap" class="modal-backdrop">
     <div class="modal">
       <div class="header">
@@ -219,101 +473,6 @@
         <button id="lgEnter" class="primary pill"><i data-lucide="log-in"></i> Entra</button>
       </div>
       <small class="muted">L’URL del Worker e il Device sono predefiniti.</small>
-    </div>
-  </div>
-
-  <!-- PLAYLIST EDITOR MODAL -->
-  <div id="plWrap" class="modal-backdrop">
-    <div class="modal" style="width:min(980px,92vw)">
-      <div class="header">
-        <h3 id="plHdr">Playlist</h3>
-        <button id="plClose" class="pill ghost"><i data-lucide="x"></i></button>
-      </div>
-
-      <div class="row" style="margin-bottom:8px">
-        <div style="flex:1">
-          <label class="muted">Nome playlist</label>
-          <input id="plNameBox" placeholder="Nuova playlist">
-        </div>
-        <div style="align-self:flex-end">
-          <button id="plReloadFiles" class="pill">Aggiorna files</button>
-        </div>
-      </div>
-
-      <div class="two-cols">
-        <div>
-          <strong>Disponibili (R2)</strong>
-          <div class="listbox" id="plAvail"></div>
-
-          <div class="row" style="margin-top:8px">
-            <input type="file" id="plUploadFile">
-            <button id="plUploadBtn" class="pill primary">Aggiungi file</button>
-          </div>
-          <small class="muted">Dopo l’upload il file compare nell’elenco “Disponibili”.</small>
-        </div>
-
-        <div>
-          <strong>Tracce nella playlist</strong>
-          <div class="listbox" id="plChosen"></div>
-          <div class="row" style="margin-top:8px">
-            <button id="plUp" class="pill">Su</button>
-            <button id="plDown" class="pill">Giù</button>
-            <button id="plDelItem" class="pill warn">Rimuovi</button>
-          </div>
-        </div>
-      </div>
-
-      <div class="row" style="margin-top:12px;justify-content:space-between">
-        <button id="plDeleteBtn" class="pill warn"><i data-lucide="trash-2"></i> Elimina playlist</button>
-        <div>
-          <button id="plSave" class="pill primary"><i data-lucide="save"></i> Salva</button>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- SCHEDULE MODAL -->
-  <div id="schWrap" class="modal-backdrop">
-    <div class="modal" style="width:min(720px,92vw)">
-      <div class="header">
-        <h3 id="schHdr">Nuova schedulazione</h3>
-        <button id="schClose" class="pill ghost"><i data-lucide="x"></i></button>
-      </div>
-
-      <div class="two-cols">
-        <div>
-          <label class="muted">Ora (24h)</label>
-          <input id="schTime" type="time" step="60" placeholder="HH:MM">
-        </div>
-        <div>
-          <label class="muted">Playlist</label>
-          <select id="schPlSel"></select>
-        </div>
-      </div>
-
-      <div style="margin-top:12px">
-        <label class="muted">Giorni</label>
-        <div class="row">
-          <label><input type="checkbox" class="schDay" value="mon"> Lun</label>
-          <label><input type="checkbox" class="schDay" value="tue"> Mar</label>
-          <label><input type="checkbox" class="schDay" value="wed"> Mer</label>
-          <label><input type="checkbox" class="schDay" value="thu"> Gio</label>
-          <label><input type="checkbox" class="schDay" value="fri"> Ven</label>
-          <label><input type="checkbox" class="schDay" value="sat"> Sab</label>
-          <label><input type="checkbox" class="schDay" value="sun"> Dom</label>
-        </div>
-      </div>
-
-      <div class="row" style="margin-top:12px;justify-content:space-between">
-        <button id="schEnabled" class="toggle on" data-on="1"><i data-lucide="power"></i> ON</button>
-        <div>
-          <button id="schSave" class="pill primary"><i data-lucide="save"></i> Salva</button>
-        </div>
-      </div>
-
-      <small class="muted" style="display:block;margin-top:8px">
-        Timezone: Europe/Rome · In caso di coda attiva, la schedulazione <b>sostituisce</b> la riproduzione corrente.
-      </small>
     </div>
   </div>
 
