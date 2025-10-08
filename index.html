@@ -366,11 +366,13 @@ img, video, iframe {
 }
 
 /* Contenitori principali fluidi */
+/* Contenitori principali fluidi */
 main, section, .container, .card {
   width: 100%;
   box-sizing: border-box;
-  overflow: hidden;
+  overflow-x: hidden; /* <-- corregge il problema */
 }
+
 
 /* Breakpoint tablet */
 @media (max-width: 768px) {
