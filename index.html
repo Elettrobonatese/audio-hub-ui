@@ -5,216 +5,378 @@
   <title>Audio Hub Control</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <style>
-    :root{
-      --bg:#0b0f14; --panel:#0f172a; --panel-2:#111827; --line:#1f2937; --text:#e6edf3; --muted:#9ca3af; --brand:#2563eb; --warn:#7c2d12;
-    }
-    *{box-sizing:border-box}
-    body{margin:0;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
-    header{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 16px;background:var(--panel-2);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:5}
-    header .brand{display:flex;gap:8px;align-items:center;font-weight:700}
-    header .right{display:flex;gap:8px;align-items:center}
-    main{display:grid;grid-template-columns:280px 1fr;gap:16px;padding:16px}
-    .card{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:16px;box-shadow:0 10px 20px rgb(0 0 0 / .2)}
-    .muted{color:var(--muted)}
+  :root {
+    --bg:#0b0f14;
+    --panel:#0f172a;
+    --panel-2:#111827;
+    --line:#1f2937;
+    --text:#e6edf3;
+    --muted:#9ca3af;
+    --brand:#2563eb;
+    --warn:#7c2d12;
+  }
 
-    button,input,select,textarea{background:var(--panel-2);color:var(--text);border:1px solid var(--line);border-radius:10px;padding:8px 12px}
-    button{cursor:pointer;transition:.15s transform,.15s opacity;display:inline-flex;align-items:center;gap:8px}
-    button:hover{transform:translateY(-1px);opacity:.95}
-    button:active{transform:translateY(0);opacity:.9}
-    .btn{padding:8px 12px}
-    .primary{background:var(--brand);border-color:var(--brand)}
-    .warn{background:var(--warn);border-color:var(--warn)}
-    .ghost{background:transparent}
-    .pill{border-radius:999px;padding:6px 10px}
-    .ok{color:#22c55e}.err{color:#ef4444}
+  * { box-sizing:border-box; }
 
-    /* Sidebar playlists */
-    .sidebar h3{margin:0 0 8px}
-    .pl-list{display:flex;flex-direction:column;gap:8px;max-height:60vh;overflow:auto}
-    .pl-item{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:10px;border:1px solid var(--line);border-radius:10px}
-    .pl-item .name{font-weight:600}
-    .pl-item small{color:var(--muted)}
-
-    /* Player stile Spotify */
-    .player{display:grid;grid-template-columns:100px 1fr;gap:16px;align-items:center}
-    .cover{width:100px;height:100px;border-radius:10px;background:#0b1220;border:1px solid var(--line);display:flex;align-items:center;justify-content:center;font-weight:700;color:#94a3b8}
-    .track-meta{display:flex;flex-direction:column;gap:4px}
-    .track-title{font-weight:700}
-    .controls{display:flex;align-items:center;gap:8px;margin-top:8px;flex-wrap:wrap}
-    .range{appearance:none;width:100%;height:6px;background:#0f1a2e;border-radius:999px;outline:none}
-    .row{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
-    .split{display:grid;grid-template-columns:1fr 1fr;gap:16px}
-    .table{width:100%;border-collapse:collapse}
-    .table th,.table td{border-bottom:1px solid var(--line);padding:8px;text-align:left}
-    .table th{color:var(--muted);font-weight:600}
-
-    /* Modals */
-    .modal-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.55);display:none;align-items:center;justify-content:center;z-index:50}
-    .modal{width:min(780px,92vw);max-height:86vh;overflow:auto;background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:16px;box-shadow:0 20px 40px rgba(0,0,0,.45)}
-    .modal.show{display:flex}
-    .modal .header{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
-    .two-cols{display:grid;grid-template-columns:1fr 1fr;gap:12px}
-    .listbox{border:1px solid var(--line);border-radius:10px;padding:8px;height:320px;overflow:auto;background:var(--panel-2)}
-    .item{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:6px;border-bottom:1px solid #1a2436}
-    .item:last-child{border-bottom:none}
-
-    @media (max-width: 980px){
-      main{grid-template-columns:1fr}
-      .player{grid-template-columns:72px 1fr}
-      .cover{width:72px;height:72px}
-      .two-cols{grid-template-columns:1fr}
-    }
-    /* 🔧 Mostra la modale quando la classe 'show' è sul BACKDROP */
-    /* 🔧 Modale on/off */
-    .modal-backdrop { display: none; }
-    .modal-backdrop.show { display: flex; }
-
-    /* 🔒 Blocca tutta la UI quando non autenticato */
-    /* 🔒 Lock UI se non autenticato */
-    body.locked main,
-    body.locked header .right > *:not(#btnLogin) {
-      pointer-events: none;
-      filter: grayscale(1) opacity(0.6);
-    }
-
-    /* Toggle ON/OFF stile pill */
-    .toggle {
-      border-radius: 999px;
-      padding: 6px 12px;
-      background: transparent;
-      border: 1px solid var(--line);
-      color: var(--text);
-      cursor: pointer;
-    /* Toggle ON/OFF */
-    .toggle { border-radius: 999px; padding: 6px 12px; background: transparent; border: 1px solid var(--line); color: var(--text); cursor: pointer; }
-    .toggle.on { background: var(--brand); border-color: var(--brand); }
-
-    /* Barra quota */
-    .quota {
-      display:flex; align-items:center; gap:10px; margin-top:6px;
-    }
-    .bar {
-      flex:1; height:8px; background:#0f1a2e; border-radius:999px; overflow:hidden; border:1px solid #1f2a40;
-    }
-    .toggle.on {
-      background: var(--brand);
-      border-color: var(--brand);
-    .bar > span {
-      display:block; height:100%; background:var(--brand); width:0%;
-    }
-
-
-/* 📱 VERSIONE MOBILE OTTIMIZZATA */
-@media (max-width: 768px) {
-
-  html, body {
-    max-width: 100%;
-    overflow-x: hidden; /* solo scroll verticale */
+  body {
+    margin:0;
+    background:var(--bg);
+    color:var(--text);
+    font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
   }
 
   header {
-    flex-wrap: wrap;
-    justify-content: space-between;
-    gap: 8px;
-    padding: 10px 14px;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:12px;
+    padding:14px 16px;
+    background:var(--panel-2);
+    border-bottom:1px solid var(--line);
+    position:sticky;
+    top:0;
+    z-index:5;
+    flex-wrap:wrap;
+  }
+
+  header .brand {
+    display:flex;
+    gap:8px;
+    align-items:center;
+    font-weight:700;
+  }
+
+  header .right {
+    display:flex;
+    gap:8px;
+    align-items:center;
+    flex-wrap:wrap;
   }
 
   main {
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-    padding: 12px;
+    display:grid;
+    grid-template-columns:280px 1fr;
+    gap:16px;
+    padding:16px;
   }
 
-  /* Card full width */
   .card {
-    width: 100%;
-    border-radius: 12px;
-    padding: 12px;
+    background:var(--panel);
+    border:1px solid var(--line);
+    border-radius:16px;
+    padding:16px;
+    box-shadow:0 10px 20px rgb(0 0 0 / .2);
   }
 
-  /* Sidebar sotto il player */
-  .sidebar {
-    order: 2;
-    width: 100%;
-    max-height: none;
+  .muted { color:var(--muted); }
+
+  button, input, select, textarea {
+    background:var(--panel-2);
+    color:var(--text);
+    border:1px solid var(--line);
+    border-radius:10px;
+    padding:8px 12px;
   }
 
-  /* Player verticale */
+  button {
+    cursor:pointer;
+    transition:.15s transform,.15s opacity;
+    display:inline-flex;
+    align-items:center;
+    gap:8px;
+  }
+
+  button:hover { transform:translateY(-1px); opacity:.95; }
+  button:active { transform:translateY(0); opacity:.9; }
+
+  .btn { padding:8px 12px; }
+  .primary { background:var(--brand); border-color:var(--brand); }
+  .warn { background:var(--warn); border-color:var(--warn); }
+  .ghost { background:transparent; }
+  .pill { border-radius:999px; padding:6px 10px; }
+  .ok { color:#22c55e; }
+  .err { color:#ef4444; }
+
+  /* Sidebar playlists */
+  .sidebar h3 { margin:0 0 8px; }
+  .pl-list {
+    display:flex;
+    flex-direction:column;
+    gap:8px;
+    max-height:60vh;
+    overflow:auto;
+  }
+  .pl-item {
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:8px;
+    padding:10px;
+    border:1px solid var(--line);
+    border-radius:10px;
+  }
+  .pl-item .name { font-weight:600; }
+  .pl-item small { color:var(--muted); }
+
+  /* Player stile Spotify */
   .player {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    text-align: center;
-    gap: 10px;
+    display:grid;
+    grid-template-columns:100px 1fr;
+    gap:16px;
+    align-items:center;
   }
 
   .cover {
-    width: 120px;
-    height: 120px;
-    margin: 0 auto 8px;
+    width:100px;
+    height:100px;
+    border-radius:10px;
+    background:#0b1220;
+    border:1px solid var(--line);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    font-weight:700;
+    color:#94a3b8;
   }
 
-  .track-meta {
-    align-items: center;
-  }
+  .track-meta { display:flex; flex-direction:column; gap:4px; }
+  .track-title { font-weight:700; }
 
   .controls {
-    display: flex;
-    flex-wrap: wrap;
-    justify-content: center;
-    gap: 8px;
-    width: 100%;
+    display:flex;
+    align-items:center;
+    gap:8px;
+    margin-top:8px;
+    flex-wrap:wrap;
   }
 
-  .controls button {
-    flex: 1 1 30%;
-    justify-content: center;
-    max-width: 120px;
+  .range {
+    appearance:none;
+    width:100%;
+    height:6px;
+    background:#0f1a2e;
+    border-radius:999px;
+    outline:none;
   }
 
   .row {
-    flex-wrap: wrap;
+    display:flex;
+    align-items:center;
+    gap:8px;
+    flex-wrap:wrap;
   }
 
-  /* Tabelle scrollabili orizzontalmente */
+  .split { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+
   .table {
-    display: block;
-    width: 100%;
-    overflow-x: auto;
-    white-space: nowrap;
+    width:100%;
+    border-collapse:collapse;
   }
 
-  /* Input e pulsanti full width */
-  input, select, textarea, button {
-    width: 100%;
-    max-width: 100%;
-    box-sizing: border-box;
+  .table th, .table td {
+    border-bottom:1px solid var(--line);
+    padding:8px;
+    text-align:left;
   }
 
-  /* Modal adattive */
+  .table th { color:var(--muted); font-weight:600; }
+
+  /* Modals */
+  .modal-backdrop {
+    position:fixed;
+    inset:0;
+    background:rgba(0,0,0,.55);
+    display:none;
+    align-items:center;
+    justify-content:center;
+    z-index:50;
+  }
+
   .modal {
-    width: 96vw !important;
-    max-height: 90vh !important;
-    overflow-y: auto;
-    border-radius: 12px;
-    padding: 14px;
+    width:min(780px,92vw);
+    max-height:86vh;
+    overflow:auto;
+    background:var(--panel);
+    border:1px solid var(--line);
+    border-radius:16px;
+    padding:16px;
+    box-shadow:0 20px 40px rgba(0,0,0,.45);
   }
 
-  /* Liste verticali più compatte */
-  .pl-list, .listbox {
-    max-height: 250px;
+  .modal.show { display:flex; }
+  .modal .header { display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; }
+  .two-cols { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+
+  .listbox {
+    border:1px solid var(--line);
+    border-radius:10px;
+    padding:8px;
+    height:320px;
+    overflow:auto;
+    background:var(--panel-2);
   }
 
-  /* Testi e pulsanti ridotti */
-  .pill {
-    padding: 6px 10px;
-    font-size: 0.9rem;
+  .item {
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:8px;
+    padding:6px;
+    border-bottom:1px solid #1a2436;
   }
-}
 
-  
-  </style>
+  .item:last-child { border-bottom:none; }
+
+  /* Lock UI se non autenticato */
+  body.locked main,
+  body.locked header .right > *:not(#btnLogin) {
+    pointer-events:none;
+    filter:grayscale(1) opacity(0.6);
+  }
+
+  /* Toggle ON/OFF */
+  .toggle {
+    border-radius:999px;
+    padding:6px 12px;
+    background:transparent;
+    border:1px solid var(--line);
+    color:var(--text);
+    cursor:pointer;
+  }
+  .toggle.on {
+    background:var(--brand);
+    border-color:var(--brand);
+  }
+
+  /* Barra quota */
+  .quota {
+    display:flex;
+    align-items:center;
+    gap:10px;
+    margin-top:6px;
+  }
+
+  .bar {
+    flex:1;
+    height:8px;
+    background:#0f1a2e;
+    border-radius:999px;
+    overflow:hidden;
+    border:1px solid #1f2a40;
+  }
+
+  .bar > span {
+    display:block;
+    height:100%;
+    background:var(--brand);
+    width:0%;
+  }
+
+  /* =============================
+     📱 VERSIONE MOBILE OTTIMIZZATA
+     ============================= */
+  @media (max-width: 768px) {
+
+    html, body {
+      max-width: 100%;
+      overflow-x: hidden;
+      overflow-y: auto;
+    }
+
+    header {
+      flex-wrap: wrap;
+      justify-content: space-between;
+      gap: 8px;
+      padding: 10px 14px;
+    }
+
+    main {
+      display: flex !important;
+      flex-direction: column !important;
+      gap: 12px;
+      padding: 12px;
+    }
+
+    .card {
+      width: 100% !important;
+      padding: 14px !important;
+      border-radius: 12px;
+    }
+
+    .sidebar {
+      order: 2;
+      width: 100% !important;
+      max-height: none !important;
+    }
+
+    /* Player verticale */
+    .player {
+      display: flex !important;
+      flex-direction: column !important;
+      align-items: center !important;
+      text-align: center !important;
+      gap: 12px;
+    }
+
+    .cover {
+      width: 120px !important;
+      height: 120px !important;
+      margin: 0 auto 10px !important;
+    }
+
+    .track-meta { align-items: center; }
+
+    .controls {
+      display: flex !important;
+      flex-wrap: wrap !important;
+      justify-content: center !important;
+      gap: 8px !important;
+      width: 100% !important;
+    }
+
+    .controls button {
+      flex: 1 1 30% !important;
+      max-width: 120px !important;
+      justify-content: center;
+    }
+
+    .row {
+      flex-wrap: wrap !important;
+    }
+
+    input, select, textarea, button {
+      width: 100% !important;
+      max-width: 100% !important;
+      box-sizing: border-box !important;
+    }
+
+    .table {
+      display: block !important;
+      width: 100% !important;
+      overflow-x: auto !important;
+      white-space: nowrap !important;
+    }
+
+    .modal {
+      width: 96vw !important;
+      height: auto !important;
+      max-height: 90vh !important;
+      overflow-y: auto !important;
+      border-radius: 12px !important;
+      padding: 14px !important;
+    }
+
+    .pill {
+      padding: 6px 10px;
+      font-size: 0.9rem;
+    }
+
+    .listbox, .pl-list {
+      max-height: 250px;
+    }
+  }
+</style>
+
   <script src="https://unpkg.com/lucide@latest"></script>
 </head>
 <body>
