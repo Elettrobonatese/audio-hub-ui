@@ -375,6 +375,11 @@
       max-height: 250px;
     }
   }
+
+/* Correzione apertura modali */
+.modal-backdrop { display: none; align-items:center; justify-content:center; }
+.modal-backdrop.show { display: flex !important; }
+
 </style>
 
   <script src="https://unpkg.com/lucide@latest"></script>
@@ -541,7 +546,7 @@
           <div class="row" style="margin-top:8px">
             <input type="file" id="plUploadFile">
             <input id="plUploadPrefix" placeholder="uploads/">
-            <button id="plUploadBtn" class="pill primary">Carica</button>
+            
             <button id="plUploadBtn" class="pill primary">Aggiungi file</button>
           </div>
           <small class="muted">Dopo l’upload il file compare nell’elenco “Disponibili”.</small>
