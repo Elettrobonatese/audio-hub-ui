@@ -376,6 +376,41 @@
     }
   }
 
+  /* 🔧 Pulsanti più corti su mobile */
+@media (max-width: 768px) {
+  /* I pulsanti pill tornano alla loro larghezza naturale */
+  .pill {
+    width: auto !important;
+    min-width: 100px;
+    max-width: 140px;
+    display: inline-flex !important;
+    justify-content: center !important;
+    align-items: center;
+    white-space: nowrap;
+  }
+
+  /* Allinea i pulsanti in centro se sono in una row */
+  .row {
+    justify-content: center !important;
+  }
+
+  /* Mantieni la larghezza piena solo per input/file */
+  input[type="file"],
+  input[type="text"],
+  input[type="password"],
+  input[type="number"],
+  select {
+    width: 100% !important;
+  }
+
+  /* Pulsanti in intestazioni (es. “Crea”, “Aggiorna”) */
+  .row > .pill.primary,
+  .row > .pill {
+    flex: 0 0 auto !important;
+  }
+}
+
+
   /* Correzione apertura modali */
 .modal-backdrop { display: none; align-items:center; justify-content:center; }
 .modal-backdrop.show { display: flex !important; }
