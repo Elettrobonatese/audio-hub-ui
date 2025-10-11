@@ -58,12 +58,28 @@
     .table th{color:var(--muted);font-weight:600}
 
     /* Modals */
-    .modal-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.55);
-      display:none;align-items:center;justify-content:center;z-index:50}
-    .modal{width:min(780px,92vw);max-height:86vh;overflow:auto;
-      background:var(--panel);border:1px solid var(--line);border-radius:16px;
-      padding:16px;box-shadow:0 20px 40px rgba(0,0,0,.45)}
-    .modal.show{display:flex}
+    .modal-backdrop{
+      position:fixed;
+      inset:0;
+      background:rgba(0,0,0,.55);
+      display:none;
+      align-items:center;
+      justify-content:center;
+      z-index:200; /* sopra sidebar */
+    }
+    .modal-backdrop.show{display:flex;}
+    .modal{
+      width:min(780px,92vw);
+      max-height:86vh;
+      overflow:auto;
+      background:var(--panel);
+      border:1px solid var(--line);
+      border-radius:16px;
+      padding:16px;
+      box-shadow:0 20px 40px rgba(0,0,0,.45);
+      z-index:201;
+    }
+
     .modal .header{display:flex;justify-content:space-between;
       align-items:center;margin-bottom:10px}
     .two-cols{display:grid;grid-template-columns:1fr 1fr;gap:12px}
@@ -112,10 +128,10 @@
       }
       body.sidebar-open .sidebar{transform:translateX(0);}
 
-      /* Overlay dietro */
+      /* Overlay dietro sidebar */
       #sidebarOverlay{
         position:fixed;inset:0;background:rgba(0,0,0,0.5);
-        z-index:10;display:none;
+        z-index:100;display:none;
       }
       body.sidebar-open #sidebarOverlay{display:block;}
 
@@ -164,7 +180,6 @@
 
     <!-- Colonna destra: Player + Files + Schedule -->
     <section class="card">
-      <!-- Player -->
       <div class="player">
         <div class="cover" id="cover">♫</div>
         <div>
@@ -239,7 +254,7 @@
     </section>
   </main>
 
-  <!-- Modali (login, playlist, schedule) -->
+  <!-- Modali -->
   <div id="loginWrap" class="modal-backdrop"></div>
   <div id="plWrap" class="modal-backdrop"></div>
   <div id="schWrap" class="modal-backdrop"></div>
