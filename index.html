@@ -102,6 +102,118 @@
     .bar > span {
       display:block; height:100%; background:var(--brand); width:0%;
     }
+
+
+/* 📱 VERSIONE MOBILE OTTIMIZZATA */
+@media (max-width: 768px) {
+
+  html, body {
+    max-width: 100%;
+    overflow-x: hidden; /* solo scroll verticale */
+  }
+
+  header {
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 10px 14px;
+  }
+
+  main {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding: 12px;
+  }
+
+  /* Card full width */
+  .card {
+    width: 100%;
+    border-radius: 12px;
+    padding: 12px;
+  }
+
+  /* Sidebar sotto il player */
+  .sidebar {
+    order: 2;
+    width: 100%;
+    max-height: none;
+  }
+
+  /* Player verticale */
+  .player {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    gap: 10px;
+  }
+
+  .cover {
+    width: 120px;
+    height: 120px;
+    margin: 0 auto 8px;
+  }
+
+  .track-meta {
+    align-items: center;
+  }
+
+  .controls {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 8px;
+    width: 100%;
+  }
+
+  .controls button {
+    flex: 1 1 30%;
+    justify-content: center;
+    max-width: 120px;
+  }
+
+  .row {
+    flex-wrap: wrap;
+  }
+
+  /* Tabelle scrollabili orizzontalmente */
+  .table {
+    display: block;
+    width: 100%;
+    overflow-x: auto;
+    white-space: nowrap;
+  }
+
+  /* Input e pulsanti full width */
+  input, select, textarea, button {
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
+  }
+
+  /* Modal adattive */
+  .modal {
+    width: 96vw !important;
+    max-height: 90vh !important;
+    overflow-y: auto;
+    border-radius: 12px;
+    padding: 14px;
+  }
+
+  /* Liste verticali più compatte */
+  .pl-list, .listbox {
+    max-height: 250px;
+  }
+
+  /* Testi e pulsanti ridotti */
+  .pill {
+    padding: 6px 10px;
+    font-size: 0.9rem;
+  }
+}
+
+  
   </style>
   <script src="https://unpkg.com/lucide@latest"></script>
 </head>
