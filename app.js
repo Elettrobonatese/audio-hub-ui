@@ -171,6 +171,25 @@ $("#btnStop").onclick  = () => cmd("stop");
 $("#btnPrev").onclick  = () => cmd("prev");
 $("#btnNext").onclick  = () => cmd("next");
 $("#btnClear").onclick = () => cmd("clear");
+// ====== VOLUME ======
+$("#btnVolAbs").onclick = async () => {
+  if (!S.authed) return openLogin(true);
+  let v = parseInt($("#volAbs").value || "0", 10);
+  if (!Number.isFinite(v)) return;
+  v = Math.max(0, Math.min(200, v)); // clamp 0..200
+  $("#volAbs").value = v;
+  await api(`/api/cmd/volume?device=${encodeURIComponent(S.device)}&value=${v}`, { method:"POST" });
+};
+
+$("#btnVolDown").onclick = async () => {
+  if (!S.authed) return openLogin(true);
+  await api(`/api/cmd/volume?device=${encodeURIComponent(S.device)}&delta=-10`, { method:"POST" });
+};
+
+$("#btnVolUp").onclick = async () => {
+  if (!S.authed) return openLogin(true);
+  await api(`/api/cmd/volume?device=${encodeURIComponent(S.device)}&delta=10`, { method:"POST" });
+};
 
 // LOOP tri-stato
 function updateLoopVisual(mode){
