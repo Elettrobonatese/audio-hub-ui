@@ -181,6 +181,62 @@ $("#btnClear").onclick = () => cmd("clear");
 
 // (volume, loop, refreshState — invariati dal tuo file originale)
 
+// ====== STATO / NOW PLAYING ======
+async function refreshState(){
+  if (!S.authed) return;
+  try{
+    const st = await api(`/api/state/get?device=${encodeURIComponent(S.device)}`);
+    const info = st?.state || st;
+
+    const state = (info?.state || "").toLowerCase();
+    const playing = state === "playing";
+
+    const playBtn  = $("#btnPlay");
+    const pauseBtn = $("#btnPause");
+
+    if (playing) {
+      playBtn.style.display = "none";
+      pauseBtn.style.display = "inline-flex";
+      pauseBtn.classList.add("primary");
+      playBtn.classList.remove("primary");
+    } else {
+      pauseBtn.style.display = "none";
+      playBtn.style.display = "inline-flex";
+      playBtn.classList.add("primary");
+      pauseBtn.classList.remove("primary");
+    }
+
+    const cur = info?.time ?? 0;
+    const len = info?.length ?? Math.max(cur, 0);
+    if(!S.seeking){
+      $("#timeCur").textContent = fmtTime(cur);
+      $("#timeTot").textContent = fmtTime(len);
+      const seekBar = $("#seekBar");
+      seekBar.max = len || 0;
+      seekBar.value = cur || 0;
+    }
+
+    $("#trkState").textContent = `stato: ${state || "—"}`;
+    const meta = info?.information?.category?.meta || {};
+    const title = meta.title || meta.filename || "—";
+    $("#trkTitle").textContent = title;
+
+    const lastPl = st?.last_playlist || "—";
+    $("#nowPl").textContent = `playlist: ${lastPl}`;
+
+    const repeatOn = !!info?.repeat;
+    const loopOn   = !!info?.loop;
+    let mode = "off";
+    if (loopOn) mode = "playlist";
+    else if (repeatOn) mode = "one";
+    S.loopMode = mode;
+    updateLoopVisual(mode);
+  }catch(e){
+    console.warn("refreshState error", e);
+  }
+}
+
+
 // ====== FILES (R2) ======
 async function listFiles(){
   if (!S.authed) return;
