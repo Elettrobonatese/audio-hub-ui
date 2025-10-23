@@ -238,7 +238,7 @@ async function refreshState(){
 
 
 // ====== FILES (R2) CON PAGINAZIONE ======
-async function listFiles(page = 1, perPage = 20){
+async function listFiles(page = 1, perPage = 10){
   if (!S.authed) return;
   const r = await api(`/api/files/list?prefix=&limit=1000`);
   S.r2Items = (r.items || []).slice().sort((a,b)=>
