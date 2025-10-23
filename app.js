@@ -237,26 +237,56 @@ async function refreshState(){
 }
 
 
-// ====== FILES (R2) ======
-async function listFiles(){
+// ====== FILES (R2) CON PAGINAZIONE ======
+async function listFiles(page = 1, perPage = 20){
   if (!S.authed) return;
   const r = await api(`/api/files/list?prefix=&limit=1000`);
-  S.r2Items = (r.items||[]).slice().sort((a,b)=>a.key.localeCompare(b.key, 'it', {sensitivity:'base'}));
+  S.r2Items = (r.items || []).slice().sort((a,b)=>
+    a.key.localeCompare(b.key, 'it', {sensitivity:'base'})
+  );
   S.totalBytes = S.r2Items.reduce((acc, x)=>acc + (x.size||0), 0);
   $("#r2Count").textContent = `${S.r2Items.length} oggetti`;
   updateQuotaUi();
 
-  const rows = S.r2Items.map(x=>`
+  // PAGINAZIONE
+  const totalPages = Math.ceil(S.r2Items.length / perPage);
+  page = Math.max(1, Math.min(totalPages, page));
+  const start = (page - 1) * perPage;
+  const items = S.r2Items.slice(start, start + perPage);
+
+  const rows = items.map(x=>`
     <tr>
       <td>${x.key}</td>
       <td class="muted">${fmtMB(x.size)}</td>
       <td><button data-key="${x.key}" class="pill play primary"><i data-lucide="play"></i> Play</button></td>
       <td><button data-key="${x.key}" class="pill warn del"><i data-lucide="trash-2"></i> Elimina</button></td>
     </tr>`).join("");
-  $("#r2Table").innerHTML = `<tr><th>Key</th><th>Size</th><th></th><th></th></tr>${rows}`;
+
+  // Mostra tabella + controlli
+  $("#r2Table").innerHTML = `
+    <tr><th>Key</th><th>Size</th><th></th><th></th></tr>
+    ${rows}
+  `;
+
+  // Footer con bottoni pagina
+  const pagination = document.createElement("div");
+  pagination.className = "row";
+  pagination.style.marginTop = "12px";
+  pagination.style.justifyContent = "center";
+  pagination.innerHTML = `
+    <button id="pagePrev" class="pill" ${page===1?"disabled":""}>← Prev</button>
+    <span class="muted" style="margin:0 8px">Pagina ${page} / ${totalPages}</span>
+    <button id="pageNext" class="pill" ${page===totalPages?"disabled":""}>Next →</button>
+  `;
+  $("#r2Table").after(pagination);
+
   lucide.createIcons();
 
-  // Play singolo file
+  // Eventi pulsanti pagina
+  $("#pagePrev")?.addEventListener("click", ()=> listFiles(page-1, perPage));
+  $("#pageNext")?.addEventListener("click", ()=> listFiles(page+1, perPage));
+
+  // Eventi Play / Elimina
   $$("#r2Table .play").forEach(b=> b.onclick = async ()=>{
     if (!S.authed) return openLogin(true);
     const key = b.dataset.key;
@@ -265,45 +295,14 @@ async function listFiles(){
     await api(`/api/cmd/play?device=${encodeURIComponent(S.device)}`, { method:"POST" });
   });
 
-  // Elimina
   $$("#r2Table .del").forEach(b=> b.onclick = async ()=>{
     if (!S.authed) return openLogin(true);
     if(!confirm(`Eliminare ${b.dataset.key}?`)) return;
     await api(`/api/files/delete?r2_key=${encodeURIComponent(b.dataset.key)}`, { method:"DELETE" });
-    await listFiles();
+    await listFiles(page, perPage);
   });
 }
-$("#r2List").onclick = ()=> S.authed ? listFiles() : openLogin(true);
 
-// ====== UPLOAD FILES (R2) ======
-$("#filesUploadBtn").onclick = async ()=>{
-  if (!S.authed) return openLogin(true);
-  const f = $("#filesUpload").files?.[0];
-  if (!f) return alert("Seleziona un file");
-  const wouldMB = toMB(S.totalBytes + f.size);
-  if (wouldMB > QUOTA_MB_LIMIT) {
-    return alert(`Spazio insufficiente. Caricando "${f.name}" supereresti ${QUOTA_MB_LIMIT} MB.`);
-  }
-  try{
-    showLoader(true);
-    const fd = new FormData(); fd.append("file", f, f.name);
-    const up = await api(`/api/files/upload`, { method:"POST", body:fd });
-    const key = up.key || f.name;
-    const ok = await prefetchR2(key);
-    if (!ok) {
-      await api(`/api/files/delete?r2_key=${encodeURIComponent(key)}`, { method:"DELETE" }).catch(()=>{});
-      throw new Error("Download sul PC non riuscito.");
-    }
-    setTopStatus(`Caricato e prefetch: ${key}`, true);
-    $("#filesUpload").value = "";
-    await listFiles();
-  }catch(e){
-    console.error(e);
-    alert(e.message || "Upload/prefetch fallito");
-  } finally {
-    showLoader(false);
-  }
-};
 
 // ====== PREFETCH R2 ======
 async function prefetchR2(key){
