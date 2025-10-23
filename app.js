@@ -320,7 +320,52 @@ async function prefetchR2(key){
 }
 
 // ====== PLAYLISTS: SIDEBAR + EDITOR ======
-async function loadPlaylists(){ /* invariato */ }
+// ====== PLAYLISTS: SIDEBAR ======
+async function loadPlaylists(){
+  if (!S.authed) return;
+  const r = await api("/api/pl/list");
+  S.playlistsCache = (r.playlists||[]).map(p=>p.name);
+
+  const items = (r.playlists||[]).map(p=>`
+    <div class="pl-item">
+      <div>
+        <div class="name">${p.name}</div>
+        <small class="muted">${p.count} tracce</small>
+      </div>
+      <div class="row">
+        <button class="pill" data-name="${p.name}" data-act="edit"><i data-lucide="pencil"></i></button>
+        <button class="pill primary" data-name="${p.name}" data-act="send"><i data-lucide="send"></i></button>
+        <button class="pill warn" data-name="${p.name}" data-act="delete"><i data-lucide="trash-2"></i></button>
+      </div>
+    </div>`).join("");
+
+  $("#plSidebar").innerHTML = items || `<div class="muted">Nessuna playlist</div>`;
+  lucide.createIcons();
+
+  // Azioni bottoni playlist
+  $$("#plSidebar [data-act]").forEach(btn=>{
+    const name = btn.dataset.name;
+    const act = btn.dataset.act;
+    btn.onclick = async ()=>{
+      if (!S.authed) return openLogin(true);
+      if (act === "send"){
+        await api(`/api/pl/send?name=${encodeURIComponent(name)}&device=${encodeURIComponent(S.device)}`, { method:"POST" });
+        setTopStatus(`Playlist "${name}" inviata`, true);
+      }
+      else if (act === "delete"){
+        if (!confirm(`Eliminare la playlist "${name}"?`)) return;
+        await api(`/api/pl/delete?name=${encodeURIComponent(name)}`, { method:"DELETE" });
+        await cmd("clear").catch(()=>{});
+        await loadPlaylists();
+      }
+      else if (act === "edit"){
+        S.currentPl = name;
+        openPlEditor(name);
+      }
+    };
+  });
+}
+
 $("#btnNewPl").onclick = ()=>{ if(S.authed){ S.currentPl=null; openPlEditor(null); } else openLogin(true); };
 
 const plWrap = $("#plWrap");
