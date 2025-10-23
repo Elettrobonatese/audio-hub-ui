@@ -371,6 +371,48 @@ $("#btnNewPl").onclick = ()=>{ if(S.authed){ S.currentPl=null; openPlEditor(null
 const plWrap = $("#plWrap");
 $("#plClose").onclick = ()=> plWrap.classList.remove("show");
 
+// Apri l'editor playlist (nuova o esistente)
+async function openPlEditor(name){
+  if (!S.authed) return openLogin(true);
+
+  // Header + campi base
+  $("#plHdr").textContent = name ? `Modifica: ${name}` : "Crea playlist";
+  $("#plNameBox").value = name || "";
+  $("#plDeleteBtn").style.display = name ? "inline-flex" : "none";
+
+  // reset selezioni
+  S.selAvailIdx = null;
+  S.selChosenIdx = null;
+
+  // tracce della playlist (se in modifica)
+  if (name) {
+    const r = await api(`/api/pl/get?name=${encodeURIComponent(name)}`);
+    S.plChosen = (r.tracks || []).map(t => t.r2_key);
+  } else {
+    S.plChosen = [];
+  }
+
+  // carica lista file disponibili e apri modale
+  await loadAvailFromR2();
+  plWrap.classList.add("show");
+  renderPlLists();
+}
+
+// Carica i file disponibili (R2) per l’editor
+async function loadAvailFromR2(){
+  const r = await api(`/api/files/list?prefix=&limit=1000`);
+  S.plAvail = (r.items || []).map(x => x.key)
+    .sort((a,b)=>a.localeCompare(b,'it',{sensitivity:'base'}));
+}
+
+// Aggiorna l’elenco disponibili dall’editor
+$("#plReloadFiles").onclick = async ()=>{
+  if (!S.authed) return openLogin(true);
+  await loadAvailFromR2();
+  renderPlLists();
+};
+
+
 // Upload file nel playlist editor con loader
 $("#plUploadBtn").onclick = async ()=>{
   if (!S.authed) return openLogin(true);
