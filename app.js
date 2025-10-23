@@ -268,17 +268,20 @@ async function listFiles(page = 1, perPage = 20){
     ${rows}
   `;
 
-  // Footer con bottoni pagina
-  const pagination = document.createElement("div");
-  pagination.className = "row";
-  pagination.style.marginTop = "12px";
-  pagination.style.justifyContent = "center";
-  pagination.innerHTML = `
-    <button id="pagePrev" class="pill" ${page===1?"disabled":""}>← Prev</button>
-    <span class="muted" style="margin:0 8px">Pagina ${page} / ${totalPages}</span>
-    <button id="pageNext" class="pill" ${page===totalPages?"disabled":""}>Next →</button>
-  `;
-  $("#r2Table").after(pagination);
+// Footer con bottoni pagina (rimuove eventuali precedenti)
+document.querySelectorAll(".pagination-controls").forEach(el => el.remove());
+
+const pagination = document.createElement("div");
+pagination.className = "row pagination-controls";
+pagination.style.marginTop = "12px";
+pagination.style.justifyContent = "center";
+pagination.innerHTML = `
+  <button id="pagePrev" class="pill" ${page===1?"disabled":""}>← Prev</button>
+  <span class="muted" style="margin:0 8px">Pagina ${page} / ${totalPages}</span>
+  <button id="pageNext" class="pill" ${page===totalPages?"disabled":""}>Next →</button>
+`;
+$("#r2Table").after(pagination);
+
 
   lucide.createIcons();
 
