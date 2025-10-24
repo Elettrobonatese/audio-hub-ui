@@ -206,6 +206,17 @@
   .modal.show { display:flex; }
   .modal .header { display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; }
   .two-cols { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+  .three-cols {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 12px;
+}
+
+@media (max-width:768px){
+  .three-cols { grid-template-columns: 1fr; }
+}
+
+  
 
   .listbox {
     border:1px solid var(--line);
@@ -639,16 +650,21 @@
         <button id="schClose" class="pill ghost"><i data-lucide="x"></i></button>
       </div>
 
-      <div class="two-cols">
-        <div>
-          <label class="muted">Ora (24h)</label>
-          <input id="schTime" type="time" step="60" placeholder="HH:MM">
-        </div>
-        <div>
-          <label class="muted">Playlist</label>
-          <select id="schPlSel"></select>
-        </div>
-      </div>
+     <div class="three-cols">
+  <div>
+    <label class="muted">Ora inizio</label>
+    <input id="schTime" type="time" step="60" placeholder="HH:MM">
+  </div>
+  <div>
+    <label class="muted">Ora fine</label>
+    <input id="schEndTime" type="time" step="60" placeholder="HH:MM">
+  </div>
+  <div>
+    <label class="muted">Playlist</label>
+    <select id="schPlSel"></select>
+  </div>
+</div>
+
 
       <div style="margin-top:12px">
         <label class="muted">Giorni</label>
