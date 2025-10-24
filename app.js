@@ -24,7 +24,7 @@ const S = {
   // Playlist Editor
   currentPl: null,
   plChosen: [],
-  plAvail: [],
+  plAvail:  [],
   selAvailIdx: null,
   selChosenIdx: null,
   playlistsCache: [],
@@ -38,96 +38,81 @@ const $  = (q) => document.querySelector(q);
 const $$ = (q) => document.querySelectorAll(q);
 
 // ====== UI LOADER ======
-function showLoader(on = true, msg = "Caricamento in corso...") {
+function showLoader(on = true) {
   const el = $("#uploadOverlay");
   if (!el) return;
   el.style.display = on ? "flex" : "none";
-  if (on) {
-    el.innerHTML = `
-      <div style="text-align:center;display:flex;flex-direction:column;align-items:center;gap:8px">
-        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" style="animation:spin 1s linear infinite">
-          <circle cx="12" cy="12" r="10" stroke="#60a5fa" stroke-width="3" stroke-dasharray="31.4" stroke-linecap="round" />
-        </svg>
-        <div>${msg}</div>
-      </div>`;
-  }
 }
 
-// CSS spin inline
-const spinStyle = document.createElement("style");
-spinStyle.textContent = `@keyframes spin { to { transform: rotate(360deg); } }`;
-document.head.appendChild(spinStyle);
+function safeIcons(){
+  try {
+    if (window.lucide && typeof window.lucide.createIcons === "function" && window.lucide.icons) {
+      window.lucide.createIcons();
+    }
+  } catch(e){ /* noop */ }
+}
 
 // ====== HELPERS ======
-function setAuthed(ok) {
+function setAuthed(ok){
   S.authed = !!ok;
   document.body.classList.toggle("locked", !S.authed);
   $("#btnLogin").innerHTML = S.authed
-    ? `<svg width="16" height="16" viewBox="0 0 24 24"><path d="M16 17v-3h-8v-4h8V7l5 5-5 5zM4 19h9v-2H4V7h9V5H4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2z"/></svg> Logout`
-    : `<svg width="16" height="16" viewBox="0 0 24 24"><path d="M10 17v-3H3v-4h7V7l5 5-5 5z"/></svg> Login`;
+    ? `<i data-lucide="log-out"></i> Logout`
+    : `<i data-lucide="log-in"></i> Login`;
+  try { safeIcons(); } catch {}
 }
-
-function authHeaders() {
+function authHeaders(){
   const tok = btoa(`${S.user}:${S.pass}`);
   return { Authorization: `Basic ${tok}` };
 }
-
-async function api(path, { method = "GET", headers = {}, body } = {}) {
-  const url = S.baseUrl.replace(/\/$/, "") + path;
-  showLoader(true, "Comunicazione con server...");
-  try {
-    const res = await fetch(url, { method, headers: { ...authHeaders(), ...headers }, body });
-    const txt = await res.text();
-    let data = null; 
-    try { data = JSON.parse(txt); } catch { data = { raw: txt }; }
-
-    if (res.status === 401) {
-      setAuthed(false);
-      openLogin(true);
-    }
-    if (!res.ok) throw Object.assign(new Error(data?.reason || txt || res.statusText), { status: res.status, data });
-    return data;
-  } finally {
-    showLoader(false);
+async function api(path, {method="GET", headers={}, body}={}){
+  const url = S.baseUrl.replace(/\/$/,"") + path;
+  const res = await fetch(url, { method, headers: { ...authHeaders(), ...headers }, body });
+  if (res.status === 401) {
+    setAuthed(false);
+    openLogin(true);
   }
+  const txt = await res.text();
+  let data = null; try{ data = JSON.parse(txt); }catch{ data = { raw: txt }; }
+  if(!res.ok) throw Object.assign(new Error(data?.reason || txt || res.statusText), { status:res.status, data });
+  return data;
 }
-
-function fmtTime(sec) {
+function fmtTime(sec){
   sec = Math.max(0, ~~sec);
-  const m = ~~(sec / 60), s = sec % 60;
-  return `${m}:${String(s).padStart(2, "0")}`;
+  const m = ~~(sec/60), s = sec%60;
+  return `${m}:${String(s).padStart(2,"0")}`;
 }
-function setTopStatus(t, ok = true) {
+function setTopStatus(t, ok=true){
   const el = $("#topStatus");
   el.textContent = t;
   el.className = ok ? "ok" : "err";
 }
-function highlightRow(el, on) {
+function highlightRow(el, on){
   el.style.background = on ? "#15233b" : "";
   el.style.borderColor = on ? "#26436f" : "";
 }
-function normalizeDays(arr) {
-  const order = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"];
-  const set = new Set(arr.map(x => x.toLowerCase()));
-  return order.filter(d => set.has(d)).join(",");
+function normalizeDays(arr){
+  const order = ["mon","tue","wed","thu","fri","sat","sun"];
+  const set = new Set(arr.map(x=>x.toLowerCase()));
+  return order.filter(d=>set.has(d)).join(",");
 }
-function daysToHuman(str) {
-  const map = { mon: "Lun", tue: "Mar", wed: "Mer", thu: "Gio", fri: "Ven", sat: "Sab", sun: "Dom" };
-  return (str || "").split(",").map(x => map[x] || x).join(", ");
+function daysToHuman(str){
+  const map = {mon:"Lun",tue:"Mar",wed:"Mer",thu:"Gio",fri:"Ven",sat:"Sab",sun:"Dom"};
+  return (str||"").split(",").map(x=>map[x]||x).join(", ");
 }
-function pad2(n) { return String(n).padStart(2, "0"); }
-function toMB(bytes) { return (bytes / 1024 / 1024); }
-function fmtMB(bytes) { return `${toMB(bytes).toFixed(2)} MB`; }
-function updateQuotaUi() {
+function pad2(n){ return String(n).padStart(2,"0"); }
+function toMB(bytes){ return (bytes/1024/1024); }
+function fmtMB(bytes){ return `${toMB(bytes).toFixed(2)} MB`; }
+function updateQuotaUi(){
   const usedMB = toMB(S.totalBytes);
   const pct = Math.min(100, (usedMB / QUOTA_MB_LIMIT) * 100);
   $("#quotaText").textContent = `${usedMB.toFixed(2)} / ${QUOTA_MB_LIMIT} MB`;
   $("#quotaBar").style.width = `${pct}%`;
 }
 
-// ====== LOGIN ======
+// ====== LOGIN MODAL ======
 const loginWrap = $("#loginWrap");
-function openLogin(force = false) {
+function openLogin(force=false){
   $("#lgUser").value = S.user || "admin";
   $("#lgPass").value = S.pass || "";
   $("#lgInfo").textContent = `Worker: ${S.baseUrl} · Device: ${S.device}`;
@@ -138,7 +123,7 @@ function openLogin(force = false) {
     setTimeout(() => $("#lgEnter").click(), 50);
   }
 }
-function closeLogin() {
+function closeLogin(){
   if (!S.authed) return;
   loginWrap.classList.remove("show");
   $("#lgClose").style.visibility = "visible";
@@ -154,11 +139,11 @@ $("#btnLogin").onclick = () => {
     openLogin(true);
   }
 };
-$("#lgClose").onclick = closeLogin;
-$("#lgEnter").onclick = async () => {
+$("#lgClose").onclick  = closeLogin;
+$("#lgEnter").onclick  = async () => {
   S.user = $("#lgUser").value.trim();
   S.pass = $("#lgPass").value;
-  try {
+  try{
     await api("/api/ping");
     const st = await api(`/api/devices/${encodeURIComponent(S.device)}/status`);
     setAuthed(true);
@@ -167,51 +152,56 @@ $("#lgEnter").onclick = async () => {
     localStorage.setItem("pass", S.pass);
     closeLogin();
     await bootstrapAfterLogin();
-  } catch (e) {
+  }catch(e){
     setAuthed(false);
     setTopStatus("Errore login/API", false);
     $("#lgInfo").textContent = "Credenziali errate o Worker non raggiungibile.";
     console.error(e);
   }
 };
-$("#lgPass").addEventListener("keydown", (ev) => {
+$("#lgPass").addEventListener("keydown", (ev)=>{
   if (ev.key === "Enter") $("#lgEnter").click();
 });
 
 // ====== BOOT ======
-async function bootstrapAfterLogin() {
+async function bootstrapAfterLogin(){
   if (!S.authed) return;
   await loadPlaylists();
   await listFiles();
   await loadSchedules();
-  if (!S.timerState) {
+  if(!S.timerState){
     S.timerState = setInterval(refreshState, 1000);
   }
 }
 window.addEventListener("load", () => { openLogin(false); });
 
 // ====== PLAYER CONTROLS ======
-async function cmd(p) {
+async function cmd(p){
   if (!S.authed) return openLogin(true);
-  return api(`/api/cmd/${p}?device=${encodeURIComponent(S.device)}`, { method: "POST" });
+  return api(`/api/cmd/${p}?device=${encodeURIComponent(S.device)}`, { method:"POST" });
 }
-$("#btnPlay").onclick = () => cmd("play");
+$("#btnPlay").onclick  = () => cmd("play");
 $("#btnPause").onclick = () => cmd("pause");
-$("#btnStop").onclick = () => cmd("stop");
-$("#btnPrev").onclick = () => cmd("prev");
-$("#btnNext").onclick = () => cmd("next");
+$("#btnStop").onclick  = () => cmd("stop");
+$("#btnPrev").onclick  = () => cmd("prev");
+$("#btnNext").onclick  = () => cmd("next");
 $("#btnClear").onclick = () => cmd("clear");
 
-// ====== STATO ======
-async function refreshState() {
+// (volume, loop, refreshState — invariati dal tuo file originale)
+
+// ====== STATO / NOW PLAYING ======
+async function refreshState(){
   if (!S.authed) return;
-  try {
+  try{
     const st = await api(`/api/state/get?device=${encodeURIComponent(S.device)}`);
     const info = st?.state || st;
+
     const state = (info?.state || "").toLowerCase();
     const playing = state === "playing";
-    const playBtn = $("#btnPlay");
+
+    const playBtn  = $("#btnPlay");
     const pauseBtn = $("#btnPause");
+
     if (playing) {
       playBtn.style.display = "none";
       pauseBtn.style.display = "inline-flex";
@@ -223,28 +213,36 @@ async function refreshState() {
       playBtn.classList.add("primary");
       pauseBtn.classList.remove("primary");
     }
+
     const cur = info?.time ?? 0;
     const len = info?.length ?? Math.max(cur, 0);
-    if (!S.seeking) {
+    if(!S.seeking){
       $("#timeCur").textContent = fmtTime(cur);
       $("#timeTot").textContent = fmtTime(len);
       const seekBar = $("#seekBar");
       seekBar.max = len || 0;
       seekBar.value = cur || 0;
     }
+
     $("#trkState").textContent = `stato: ${state || "—"}`;
     const meta = info?.information?.category?.meta || {};
     const title = meta.title || meta.filename || "—";
     $("#trkTitle").textContent = title;
+
     const lastPl = st?.last_playlist || "—";
     $("#nowPl").textContent = `playlist: ${lastPl}`;
-  } catch (e) {
+
+    const repeatOn = !!info?.repeat;
+    const loopOn   = !!info?.loop;
+    let mode = "off";
+    if (loopOn) mode = "playlist";
+    else if (repeatOn) mode = "one";
+    S.loopMode = mode;
+    updateLoopVisual(mode);
+  }catch(e){
     console.warn("refreshState error", e);
   }
 }
-
-// (segue con la parte Files / Playlists / Schedules invariata)
-
 
 
 // ====== FILES (R2) CON PAGINAZIONE ======
@@ -293,7 +291,7 @@ pagination.innerHTML = `
 $("#r2Table").after(pagination);
 
 
-  
+  safeIcons();
 
   // Eventi pulsanti pagina
   $("#pagePrev")?.addEventListener("click", ()=> listFiles(page-1, perPage));
@@ -352,7 +350,7 @@ async function loadPlaylists(){
     </div>`).join("");
 
   $("#plSidebar").innerHTML = items || `<div class="muted">Nessuna playlist</div>`;
-  
+  safeIcons();
 
   // Azioni bottoni playlist
   $$("#plSidebar [data-act]").forEach(btn=>{
@@ -547,7 +545,7 @@ function renderPlLists(){
   };
 
   updateSelections();
-  
+  try { safeIcons(); } catch {}
 }
 
 function updateSelections(){
@@ -603,7 +601,7 @@ function setSchEnabledVisual(on){
   schEnabledBtn.innerHTML = on
     ? `<i data-lucide="power"></i> ON`
     : `<i data-lucide="power"></i> OFF`;
-  
+  try { safeIcons(); } catch {}
 }
 schEnabledBtn.onclick = ()=>{
   const on = schEnabledBtn.dataset.on === "1";
@@ -748,7 +746,7 @@ function renderSchedules(){
     ${rows || `<tr><td colspan="4"><div class="muted">Nessuna schedulazione</div></td></tr>`}
   `;
 
-  
+  safeIcons();
 
   $$("#schTable tr[data-id]").forEach(tr=>{
     const id = parseInt(tr.dataset.id,10);
