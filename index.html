@@ -547,7 +547,15 @@
   </div>
 
   <!-- Scripts -->
-  <script src="app.js"></script>
-  <script>lucide.createIcons();</script>
+  <script src="lucide.min.js"></script>
+<script src="app.js"></script>
+<script>
+  document.addEventListener("DOMContentLoaded", () => {
+    if (window.lucide && typeof window.lucide.createIcons === "function") {
+      window.lucide.createIcons();
+    }
+  });
+</script>
+
 </body>
 </html>
