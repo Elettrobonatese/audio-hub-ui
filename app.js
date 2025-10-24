@@ -314,6 +314,42 @@ $("#r2Table").after(pagination);
   });
 }
 
+// ====== UPLOAD FILES (R2) ======
+$("#filesUploadBtn").onclick = async () => {
+  if (!S.authed) return openLogin(true);
+  const f = $("#filesUpload").files?.[0];
+  if (!f) return alert("Seleziona un file da caricare.");
+
+  const wouldMB = toMB(S.totalBytes + f.size);
+  if (wouldMB > QUOTA_MB_LIMIT) {
+    return alert(`Spazio insufficiente: supereresti ${QUOTA_MB_LIMIT} MB.`);
+  }
+
+  try {
+    showLoader(true);
+    const fd = new FormData();
+    fd.append("file", f, f.name);
+    const up = await api(`/api/files/upload`, { method: "POST", body: fd });
+
+    const key = up.key || f.name;
+    const ok = await prefetchR2(key);
+    if (!ok) {
+      await api(`/api/files/delete?r2_key=${encodeURIComponent(key)}`, { method: "DELETE" }).catch(()=>{});
+      throw new Error("Download sul PC non riuscito.");
+    }
+
+    $("#filesUpload").value = "";
+    await listFiles();
+    setTopStatus(`File "${key}" caricato con successo`, true);
+  } catch (e) {
+    console.error(e);
+    alert(e.message || "Errore durante upload");
+  } finally {
+    showLoader(false);
+  }
+};
+
+
 
 // ====== PREFETCH R2 ======
 async function prefetchR2(key){
