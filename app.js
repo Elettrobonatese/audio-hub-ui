@@ -689,51 +689,62 @@ async function openSchModal(id=null){
 $("#schClose").onclick = ()=> schWrap.classList.remove("show");
 $("#btnNewSched").onclick = ()=> openSchModal(null);
 
-$("#schSave").onclick = async ()=>{
+// ====== SALVA SCHEDULAZIONE (con ora di fine) ======
+$("#schSave").onclick = async ()=> {
   if (!S.authed) return openLogin(true);
+
   const hhmm = ($("#schTime").value || "").trim();
+  const endhhmm = ($("#schEndTime").value || "").trim();
   const days = getDaySelection();
   const pl   = $("#schPlSel").value;
   const wantEnabled = $("#schEnabled").dataset.on === "1";
 
-  if (!/^\d\d:\d\d$/.test(hhmm)) return alert("Inserisci un orario HH:MM");
+  if (!/^\d\d:\d\d$/.test(hhmm)) return alert("Inserisci un orario di inizio HH:MM");
+  if (!/^\d\d:\d\d$/.test(endhhmm)) return alert("Inserisci un orario di fine HH:MM");
+  if (hhmm >= endhhmm) return alert("L’orario di fine deve essere successivo a quello di inizio");
   if (!days) return alert("Seleziona almeno un giorno");
   if (!pl) return alert("Seleziona una playlist");
 
   const dupe = S.schedules.find(s =>
-    (s.playlist_name===pl) && (s.time_hhmm===hhmm) && (String(s.days)===days)
+    (s.playlist_name === pl) &&
+    (s.time_hhmm === hhmm) &&
+    (String(s.days) === days)
   );
-  if (S.schedEditingId==null && dupe){
+  if (S.schedEditingId == null && dupe) {
     alert("Esiste già una schedulazione per questi giorni e quest’ora con la stessa playlist.");
     return;
   }
 
-  try{
-    if (S.schedEditingId==null){
-      await api(`/api/sched/create?device=${encodeURIComponent(S.device)}&name=${encodeURIComponent(pl)}&time=${encodeURIComponent(hhmm)}&days=${encodeURIComponent(days)}&tz=${encodeURIComponent(DEFAULT_TZ)}`, { method:"POST" });
+  try {
+    if (S.schedEditingId == null) {
+      // nuova schedulazione
+      await api(`/api/sched/create?device=${encodeURIComponent(S.device)}&name=${encodeURIComponent(pl)}&time=${encodeURIComponent(hhmm)}&end_time=${encodeURIComponent(endhhmm)}&days=${encodeURIComponent(days)}&tz=${encodeURIComponent(DEFAULT_TZ)}`, { method:"POST" });
       await loadSchedules();
-      if (!wantEnabled){
+      if (!wantEnabled) {
         const row = S.schedules.find(s => s.playlist_name===pl && s.time_hhmm===hhmm && String(s.days)===days);
         if (row){ await api(`/api/sched/toggle?id=${row.id}&enabled=0`, { method:"POST" }); }
       }
       setTopStatus("Schedulazione creata", true);
     } else {
+      // modifica schedulazione
       const id = S.schedEditingId;
       await api(`/api/sched/delete?id=${id}`, { method:"DELETE" });
-      await api(`/api/sched/create?device=${encodeURIComponent(S.device)}&name=${encodeURIComponent(pl)}&time=${encodeURIComponent(hhmm)}&days=${encodeURIComponent(days)}&tz=${encodeURIComponent(DEFAULT_TZ)}`, { method:"POST" });
+      await api(`/api/sched/create?device=${encodeURIComponent(S.device)}&name=${encodeURIComponent(pl)}&time=${encodeURIComponent(hhmm)}&end_time=${encodeURIComponent(endhhmm)}&days=${encodeURIComponent(days)}&tz=${encodeURIComponent(DEFAULT_TZ)}`, { method:"POST" });
       await loadSchedules();
-      if (!wantEnabled){
+      if (!wantEnabled) {
         const row = S.schedules.find(s => s.playlist_name===pl && s.time_hhmm===hhmm && String(s.days)===days);
         if (row){ await api(`/api/sched/toggle?id=${row.id}&enabled=0`, { method:"POST" }); }
       }
       setTopStatus("Schedulazione aggiornata", true);
     }
+
     schWrap.classList.remove("show");
     await loadSchedules();
-  }catch(e){
-    alert(e?.data?.reason || e.message || "Errore");
+  } catch(e) {
+    alert(e?.data?.reason || e.message || "Errore durante il salvataggio");
   }
 };
+
 
 $("#schReload").onclick = ()=> S.authed ? loadSchedules() : openLogin(true);
 
