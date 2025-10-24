@@ -59,7 +59,7 @@ function setAuthed(ok){
   $("#btnLogin").innerHTML = S.authed
     ? `<i data-lucide="log-out"></i> Logout`
     : `<i data-lucide="log-in"></i> Login`;
-  try { lucide.createIcons(); } catch {}
+  try { safeIcons(); } catch {}
 }
 function authHeaders(){
   const tok = btoa(`${S.user}:${S.pass}`);
@@ -291,7 +291,7 @@ pagination.innerHTML = `
 $("#r2Table").after(pagination);
 
 
-  lucide.createIcons();
+  safeIcons();
 
   // Eventi pulsanti pagina
   $("#pagePrev")?.addEventListener("click", ()=> listFiles(page-1, perPage));
@@ -350,7 +350,7 @@ async function loadPlaylists(){
     </div>`).join("");
 
   $("#plSidebar").innerHTML = items || `<div class="muted">Nessuna playlist</div>`;
-  lucide.createIcons();
+  safeIcons();
 
   // Azioni bottoni playlist
   $$("#plSidebar [data-act]").forEach(btn=>{
@@ -545,7 +545,7 @@ function renderPlLists(){
   };
 
   updateSelections();
-  try { lucide.createIcons(); } catch {}
+  try { safeIcons(); } catch {}
 }
 
 function updateSelections(){
@@ -601,7 +601,7 @@ function setSchEnabledVisual(on){
   schEnabledBtn.innerHTML = on
     ? `<i data-lucide="power"></i> ON`
     : `<i data-lucide="power"></i> OFF`;
-  try { lucide.createIcons(); } catch {}
+  try { safeIcons(); } catch {}
 }
 schEnabledBtn.onclick = ()=>{
   const on = schEnabledBtn.dataset.on === "1";
@@ -746,7 +746,7 @@ function renderSchedules(){
     ${rows || `<tr><td colspan="4"><div class="muted">Nessuna schedulazione</div></td></tr>`}
   `;
 
-  lucide.createIcons();
+  safeIcons();
 
   $$("#schTable tr[data-id]").forEach(tr=>{
     const id = parseInt(tr.dataset.id,10);
