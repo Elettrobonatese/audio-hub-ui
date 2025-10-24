@@ -44,6 +44,14 @@ function showLoader(on = true) {
   el.style.display = on ? "flex" : "none";
 }
 
+function safeIcons(){
+  try {
+    if (window.lucide && typeof window.lucide.createIcons === "function" && window.lucide.icons) {
+      window.lucide.createIcons();
+    }
+  } catch(e){ /* noop */ }
+}
+
 // ====== HELPERS ======
 function setAuthed(ok){
   S.authed = !!ok;
