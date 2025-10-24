@@ -290,7 +290,7 @@
   .modal-backdrop.show { display: flex !important; }
 
 </style>
-  <script src="https://unpkg.com/lucide@latest"></script>
+  
 </head>
   
 <body>
@@ -546,13 +546,16 @@
     </div>
   </div>
 
-  <!-- Scripts -->
-  <script src="lucide.min.js"></script>
+<!-- Scripts -->
+<script src="lucide.min.js"></script>
 <script src="app.js"></script>
 <script>
-  document.addEventListener("DOMContentLoaded", () => {
+  window.addEventListener("load", () => {
     if (window.lucide && typeof window.lucide.createIcons === "function") {
       window.lucide.createIcons();
+      console.log("✅ Lucide inizializzato correttamente");
+    } else {
+      console.warn("⚠️ Lucide non trovato");
     }
   });
 </script>
