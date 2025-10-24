@@ -159,16 +159,9 @@ $("#lgEnter").onclick  = async () => {
     console.error(e);
   }
 };
-
-document.addEventListener("DOMContentLoaded", () => {
-  const passInput = $("#lgPass");
-  if (passInput) {
-    passInput.addEventListener("keydown", (ev) => {
-      if (ev.key === "Enter") $("#lgEnter").click();
-    });
-  }
+$("#lgPass").addEventListener("keydown", (ev)=>{
+  if (ev.key === "Enter") $("#lgEnter").click();
 });
-
 
 // ====== BOOT ======
 async function bootstrapAfterLogin(){
@@ -702,13 +695,10 @@ $("#schSave").onclick = async ()=>{
   const days = getDaySelection();
   const pl   = $("#schPlSel").value;
   const wantEnabled = $("#schEnabled").dataset.on === "1";
-  const endhhmm = ($("#schEndTime").value || "").trim();
 
-
-if (!/^\d\d:\d\d$/.test(hhmm)) return alert("Inserisci un orario di inizio HH:MM");
-if (!/^\d\d:\d\d$/.test(endhhmm)) return alert("Inserisci un orario di fine HH:MM");
-if (hhmm >= endhhmm) return alert("L’orario di fine deve essere successivo all’inizio");
-
+  if (!/^\d\d:\d\d$/.test(hhmm)) return alert("Inserisci un orario HH:MM");
+  if (!days) return alert("Seleziona almeno un giorno");
+  if (!pl) return alert("Seleziona una playlist");
 
   const dupe = S.schedules.find(s =>
     (s.playlist_name===pl) && (s.time_hhmm===hhmm) && (String(s.days)===days)
@@ -720,8 +710,7 @@ if (hhmm >= endhhmm) return alert("L’orario di fine deve essere successivo all
 
   try{
     if (S.schedEditingId==null){
-      await api(`/api/sched/create?device=${encodeURIComponent(S.device)}&name=${encodeURIComponent(pl)}&time=${encodeURIComponent(hhmm)}&end_time=${encodeURIComponent(endhhmm)}&days=${encodeURIComponent(days)}&tz=${encodeURIComponent(DEFAULT_TZ)}`, { method:"POST" });
-
+      await api(`/api/sched/create?device=${encodeURIComponent(S.device)}&name=${encodeURIComponent(pl)}&time=${encodeURIComponent(hhmm)}&days=${encodeURIComponent(days)}&tz=${encodeURIComponent(DEFAULT_TZ)}`, { method:"POST" });
       await loadSchedules();
       if (!wantEnabled){
         const row = S.schedules.find(s => s.playlist_name===pl && s.time_hhmm===hhmm && String(s.days)===days);
@@ -731,8 +720,7 @@ if (hhmm >= endhhmm) return alert("L’orario di fine deve essere successivo all
     } else {
       const id = S.schedEditingId;
       await api(`/api/sched/delete?id=${id}`, { method:"DELETE" });
-     await api(`/api/sched/create?device=${encodeURIComponent(S.device)}&name=${encodeURIComponent(pl)}&time=${encodeURIComponent(hhmm)}&end_time=${encodeURIComponent(endhhmm)}&days=${encodeURIComponent(days)}&tz=${encodeURIComponent(DEFAULT_TZ)}`, { method:"POST" });
-
+      await api(`/api/sched/create?device=${encodeURIComponent(S.device)}&name=${encodeURIComponent(pl)}&time=${encodeURIComponent(hhmm)}&days=${encodeURIComponent(days)}&tz=${encodeURIComponent(DEFAULT_TZ)}`, { method:"POST" });
       await loadSchedules();
       if (!wantEnabled){
         const row = S.schedules.find(s => s.playlist_name===pl && s.time_hhmm===hhmm && String(s.days)===days);
@@ -752,18 +740,11 @@ $("#schReload").onclick = ()=> S.authed ? loadSchedules() : openLogin(true);
 async function loadSchedules(){
   if (!S.authed) return;
   const r = await api(`/api/sched/list`);
-S.schedules = (r.schedules || []).map(x=>({
-  id: x.id,
-  device: x.device,
-  playlist_name: x.playlist_name,
-  tz: x.tz,
-  time_hhmm: x.time_hhmm,
-  end_time_hhmm: x.end_time_hhmm || null,
-  days: x.days,
-  enabled: !!x.enabled,
-  last_fired_key: x.last_fired_key || null
-}));
-
+  S.schedules = (r.schedules || []).map(x=>({
+    id:x.id, device:x.device, playlist_name:x.playlist_name,
+    tz:x.tz, time_hhmm:x.time_hhmm, days:x.days, enabled:!!x.enabled,
+    last_fired_key: x.last_fired_key || null
+  }));
 
   S.schedules.sort((a,b)=>{
     if (a.time_hhmm !== b.time_hhmm) return a.time_hhmm.localeCompare(b.time_hhmm);
@@ -784,8 +765,7 @@ function renderSchedules(){
     const last = s.last_fired_key ? `<small class="muted">${s.last_fired_key}</small>` : `<small class="muted">—</small>`;
     return `
       <tr data-id="${s.id}">
-        <td><strong>${s.time_hhmm}–${s.end_time_hhmm || "?"}</strong><div>${humanDays}</div></td>
-
+        <td><strong>${s.time_hhmm}</strong><div>${humanDays}</div></td>
         <td>${s.playlist_name}</td>
         <td>${last}</td>
         <td style="white-space:nowrap">
