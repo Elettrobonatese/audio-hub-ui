@@ -187,6 +187,25 @@ $("#btnPrev").onclick  = () => cmd("prev");
 $("#btnNext").onclick  = () => cmd("next");
 $("#btnClear").onclick = () => cmd("clear");
 
+// ====== CONTROLLI VOLUME ======
+$("#btnVolAbs").onclick = async () => {
+  if (!S.authed) return openLogin(true);
+  const v = parseInt($("#volAbs").value, 10);
+  const val = Math.max(0, Math.min(200, isNaN(v) ? 0 : v));
+  await api(`/api/cmd/volume-abs?device=${encodeURIComponent(S.device)}&val=${val}`, { method:"POST" });
+};
+
+$("#btnVolDown").onclick = async () => {
+  if (!S.authed) return openLogin(true);
+  await api(`/api/cmd/volume-add?device=${encodeURIComponent(S.device)}&delta=${-10}`, { method:"POST" });
+};
+
+$("#btnVolUp").onclick = async () => {
+  if (!S.authed) return openLogin(true);
+  await api(`/api/cmd/volume-add?device=${encodeURIComponent(S.device)}&delta=${10}`, { method:"POST" });
+};
+
+
 // (volume, loop, refreshState — invariati dal tuo file originale)
 
 // ====== STATO / NOW PLAYING ======
