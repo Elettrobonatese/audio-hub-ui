@@ -159,9 +159,16 @@ $("#lgEnter").onclick  = async () => {
     console.error(e);
   }
 };
-$("#lgPass").addEventListener("keydown", (ev)=>{
-  if (ev.key === "Enter") $("#lgEnter").click();
+
+document.addEventListener("DOMContentLoaded", () => {
+  const passInput = $("#lgPass");
+  if (passInput) {
+    passInput.addEventListener("keydown", (ev) => {
+      if (ev.key === "Enter") $("#lgEnter").click();
+    });
+  }
 });
+
 
 // ====== BOOT ======
 async function bootstrapAfterLogin(){
