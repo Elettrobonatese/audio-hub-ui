@@ -207,9 +207,6 @@ $("#btnVolUp").onclick = async () => {
   await api(`/api/cmd/volume?device=${encodeURIComponent(S.device)}&delta=10`, { method:"POST" });
 };
 
-
-// (volume, loop, refreshState — invariati dal tuo file originale)
-
 // ====== STATO / NOW PLAYING ======
 async function refreshState(){
   if (!S.authed) return;
@@ -265,7 +262,6 @@ async function refreshState(){
   }
 }
 
-
 // ====== FILES (R2) CON PAGINAZIONE ======
 async function listFiles(page = 1, perPage = 10){
   if (!S.authed) return;
@@ -277,7 +273,6 @@ async function listFiles(page = 1, perPage = 10){
   $("#r2Count").textContent = `${S.r2Items.length} oggetti`;
   updateQuotaUi();
 
-  // PAGINAZIONE
   const totalPages = Math.ceil(S.r2Items.length / perPage);
   page = Math.max(1, Math.min(totalPages, page));
   const start = (page - 1) * perPage;
@@ -291,15 +286,12 @@ async function listFiles(page = 1, perPage = 10){
       <td><button data-key="${x.key}" class="pill warn del"><i data-lucide="trash-2"></i> Elimina</button></td>
     </tr>`).join("");
 
-  // Mostra tabella + controlli
   $("#r2Table").innerHTML = `
     <tr><th>Key</th><th>Size</th><th></th><th></th></tr>
     ${rows}
   `;
 
-  // Footer con bottoni pagina (rimuove eventuali precedenti)
   document.querySelectorAll(".pagination-controls").forEach(el => el.remove());
-
   const pagination = document.createElement("div");
   pagination.className = "row pagination-controls";
   pagination.style.marginTop = "12px";
@@ -313,11 +305,9 @@ async function listFiles(page = 1, perPage = 10){
 
   safeIcons();
 
-  // Eventi pulsanti pagina
   $("#pagePrev")?.addEventListener("click", ()=> listFiles(page-1, perPage));
   $("#pageNext")?.addEventListener("click", ()=> listFiles(page+1, perPage));
 
-  // Eventi Play / Elimina
   $$("#r2Table .play").forEach(b=> b.onclick = async ()=>{
     if (!S.authed) return openLogin(true);
     const key = b.dataset.key;
@@ -369,8 +359,6 @@ $("#filesUploadBtn").onclick = async () => {
   }
 };
 
-
-
 // ====== PREFETCH R2 ======
 async function prefetchR2(key){
   try{
@@ -385,7 +373,6 @@ async function prefetchR2(key){
   }
 }
 
-// ====== PLAYLISTS: SIDEBAR + EDITOR ======
 // ====== PLAYLISTS: SIDEBAR ======
 async function loadPlaylists(){
   if (!S.authed) return;
@@ -408,7 +395,6 @@ async function loadPlaylists(){
   $("#plSidebar").innerHTML = items || `<div class="muted">Nessuna playlist</div>`;
   safeIcons();
 
-  // Azioni bottoni playlist
   $$("#plSidebar [data-act]").forEach(btn=>{
     const name = btn.dataset.name;
     const act = btn.dataset.act;
@@ -437,20 +423,17 @@ $("#btnNewPl").onclick = ()=>{ if(S.authed){ S.currentPl=null; openPlEditor(null
 const plWrap = $("#plWrap");
 $("#plClose").onclick = ()=> plWrap.classList.remove("show");
 
-// Apri l'editor playlist (nuova o esistente)
+// Apri l'editor playlist
 async function openPlEditor(name){
   if (!S.authed) return openLogin(true);
 
-  // Header + campi base
   $("#plHdr").textContent = name ? `Modifica: ${name}` : "Crea playlist";
   $("#plNameBox").value = name || "";
   $("#plDeleteBtn").style.display = name ? "inline-flex" : "none";
 
-  // reset selezioni
   S.selAvailIdx = null;
   S.selChosenIdx = null;
 
-  // tracce della playlist (se in modifica)
   if (name) {
     const r = await api(`/api/pl/get?name=${encodeURIComponent(name)}`);
     S.plChosen = (r.tracks || []).map(t => t.r2_key);
@@ -458,7 +441,6 @@ async function openPlEditor(name){
     S.plChosen = [];
   }
 
-  // carica lista file disponibili e apri modale
   await loadAvailFromR2();
   plWrap.classList.add("show");
   renderPlLists();
@@ -478,8 +460,7 @@ $("#plReloadFiles").onclick = async ()=>{
   renderPlLists();
 };
 
-
-// Upload file nel playlist editor con loader
+// Upload file nel playlist editor
 $("#plUploadBtn").onclick = async ()=>{
   if (!S.authed) return openLogin(true);
   const f = $("#plUploadFile").files?.[0];
@@ -510,6 +491,7 @@ $("#plUploadBtn").onclick = async ()=>{
     showLoader(false);
   }
 };
+
 function renderPlLists(){
   const availHtml = S.plAvail.map((k,i)=>`
     <div class="item" data-idx="${i}">
@@ -686,24 +668,21 @@ async function openSchModal(id=null){
   }
   populatePlSelect();
 
-  // end input potrebbe non esistere ancora nell'HTML: gestiscilo in sicurezza
-  const endInput = document.getElementById("schEndTime");
-
   if (id==null){
     $("#schHdr").textContent = "Nuova schedulazione";
     const now = new Date();
     const hh = pad2(now.getHours());
     const mm = pad2(now.getMinutes());
     $("#schTime").value = `${hh}:${mm}`;
-    if (endInput) endInput.value = ""; // nessun valore di default
+    $("#schEndTime").value = ""; // fine opzionale
     setDaySelection("mon,tue,wed,thu,fri,sat,sun");
     setSchEnabledVisual(true);
   } else {
     $("#schHdr").textContent = `Modifica schedulazione #${id}`;
     const row = S.schedules.find(x=>x.id===id);
     if (!row) { alert("Schedulazione non trovata"); return; }
-    $("#schTime").value = row.time_hhmm;
-    if (endInput) endInput.value = row.end_time_hhmm || "";
+    $("#schTime").value = row.time_hhmm || "";
+    $("#schEndTime").value = row.end_hhmm || ""; // <-- prefill
     setDaySelection(row.days || "");
     $("#schPlSel").value = row.playlist_name;
     setSchEnabledVisual(!!row.enabled);
@@ -714,23 +693,19 @@ async function openSchModal(id=null){
 $("#schClose").onclick = ()=> schWrap.classList.remove("show");
 $("#btnNewSched").onclick = ()=> openSchModal(null);
 
-// ====== SALVA SCHEDULAZIONE (con ora di fine opzionale) ======
+// ====== SALVA SCHEDULAZIONE (fine opzionale) ======
 $("#schSave").onclick = async ()=> {
   if (!S.authed) return openLogin(true);
 
   const hhmm = ($("#schTime").value || "").trim();
-  const endInput = document.getElementById("schEndTime");
-  const endhhmm = endInput ? (endInput.value || "").trim() : ""; // opzionale
+  const endhhmm = ($("#schEndTime").value || "").trim();
   const days = getDaySelection();
   const pl   = $("#schPlSel").value;
   const wantEnabled = $("#schEnabled").dataset.on === "1";
 
   if (!/^\d\d:\d\d$/.test(hhmm)) return alert("Inserisci un orario di inizio HH:MM");
-  // Se l'utente ha inserito la fine, validala; altrimenti ignorala
-  if (endhhmm) {
-    if (!/^\d\d:\d\d$/.test(endhhmm)) return alert("Orario di fine non valido (HH:MM)");
-    if (hhmm >= endhhmm) return alert("L’orario di fine deve essere successivo a quello di inizio");
-  }
+  if (endhhmm && !/^\d\d:\d\d$/.test(endhhmm)) return alert("Orario di fine non valido (HH:MM)");
+  if (endhhmm && hhmm >= endhhmm) return alert("L’orario di fine deve essere successivo a quello di inizio");
   if (!days) return alert("Seleziona almeno un giorno");
   if (!pl) return alert("Seleziona una playlist");
 
@@ -745,14 +720,11 @@ $("#schSave").onclick = async ()=> {
   }
 
   try {
-    // Costruisci la query tenendo 'end' opzionale (il worker si aspetta &end=...)
-    const baseParams = `device=${encodeURIComponent(S.device)}&name=${encodeURIComponent(pl)}&time=${encodeURIComponent(hhmm)}&days=${encodeURIComponent(days)}&tz=${encodeURIComponent(DEFAULT_TZ)}`;
-    const endParam = endhhmm ? `&end=${encodeURIComponent(endhhmm)}` : "";
-    const fullParams = `${baseParams}${endParam}`;
+    const base = `/api/sched/create?device=${encodeURIComponent(S.device)}&name=${encodeURIComponent(pl)}&time=${encodeURIComponent(hhmm)}&days=${encodeURIComponent(days)}&tz=${encodeURIComponent(DEFAULT_TZ)}`;
+    const url = endhhmm ? `${base}&end_time=${encodeURIComponent(endhhmm)}` : base;
 
     if (S.schedEditingId == null) {
-      // nuova schedulazione
-      await api(`/api/sched/create?${fullParams}`, { method:"POST" });
+      await api(url, { method:"POST" });
       await loadSchedules();
       if (!wantEnabled) {
         const row = S.schedules.find(s => s.playlist_name===pl && s.time_hhmm===hhmm && String(s.days)===days);
@@ -760,10 +732,9 @@ $("#schSave").onclick = async ()=> {
       }
       setTopStatus("Schedulazione creata", true);
     } else {
-      // modifica schedulazione
       const id = S.schedEditingId;
       await api(`/api/sched/delete?id=${id}`, { method:"DELETE" });
-      await api(`/api/sched/create?${fullParams}`, { method:"POST" });
+      await api(url, { method:"POST" });
       await loadSchedules();
       if (!wantEnabled) {
         const row = S.schedules.find(s => s.playlist_name===pl && s.time_hhmm===hhmm && String(s.days)===days);
@@ -779,7 +750,6 @@ $("#schSave").onclick = async ()=> {
   }
 };
 
-
 $("#schReload").onclick = ()=> S.authed ? loadSchedules() : openLogin(true);
 
 async function loadSchedules(){
@@ -787,15 +757,15 @@ async function loadSchedules(){
   const r = await api(`/api/sched/list`);
   S.schedules = (r.schedules || []).map(x=>({
     id:x.id, device:x.device, playlist_name:x.playlist_name,
-    tz:x.tz, time_hhmm:x.time_hhmm, days:x.days, enabled:!!x.enabled,
+    tz:x.tz, time_hhmm:x.time_hhmm, end_hhmm: x.end_hhmm || null,
+    days:x.days, enabled:!!x.enabled,
     last_fired_key: x.last_fired_key || null,
-    // Manteniamo anche i nuovi campi per futura UI
-    end_time_hhmm: x.end_time_hhmm || null,
     last_stopped_key: x.last_stopped_key || null
   }));
 
   S.schedules.sort((a,b)=>{
     if (a.time_hhmm !== b.time_hhmm) return a.time_hhmm.localeCompare(b.time_hhmm);
+    if ((a.end_hhmm || "") !== (b.end_hhmm || "")) return (a.end_hhmm||"").localeCompare(b.end_hhmm||"");
     if (a.days !== b.days) return a.days.localeCompare(b.days);
     return a.playlist_name.localeCompare(b.playlist_name);
   });
@@ -813,7 +783,7 @@ function renderSchedules(){
     const last = s.last_fired_key ? `<small class="muted">${s.last_fired_key}</small>` : `<small class="muted">—</small>`;
     return `
       <tr data-id="${s.id}">
-        <td><strong>${s.time_hhmm}</strong><div>${humanDays}</div></td>
+        <td><strong>${s.time_hhmm}</strong>${s.end_hhmm ? ` → <small>${s.end_hhmm}</small>` : ""}<div>${humanDays}</div></td>
         <td>${s.playlist_name}</td>
         <td>${last}</td>
         <td style="white-space:nowrap">
