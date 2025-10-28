@@ -297,20 +297,19 @@ async function listFiles(page = 1, perPage = 10){
     ${rows}
   `;
 
-// Footer con bottoni pagina (rimuove eventuali precedenti)
-document.querySelectorAll(".pagination-controls").forEach(el => el.remove());
+  // Footer con bottoni pagina (rimuove eventuali precedenti)
+  document.querySelectorAll(".pagination-controls").forEach(el => el.remove());
 
-const pagination = document.createElement("div");
-pagination.className = "row pagination-controls";
-pagination.style.marginTop = "12px";
-pagination.style.justifyContent = "center";
-pagination.innerHTML = `
-  <button id="pagePrev" class="pill" ${page===1?"disabled":""}>← Prev</button>
-  <span class="muted" style="margin:0 8px">Pagina ${page} / ${totalPages}</span>
-  <button id="pageNext" class="pill" ${page===totalPages?"disabled":""}>Next →</button>
-`;
-$("#r2Table").after(pagination);
-
+  const pagination = document.createElement("div");
+  pagination.className = "row pagination-controls";
+  pagination.style.marginTop = "12px";
+  pagination.style.justifyContent = "center";
+  pagination.innerHTML = `
+    <button id="pagePrev" class="pill" ${page===1?"disabled":""}>← Prev</button>
+    <span class="muted" style="margin:0 8px">Pagina ${page} / ${totalPages}</span>
+    <button id="pageNext" class="pill" ${page===totalPages?"disabled":""}>Next →</button>
+  `;
+  $("#r2Table").after(pagination);
 
   safeIcons();
 
@@ -687,12 +686,16 @@ async function openSchModal(id=null){
   }
   populatePlSelect();
 
+  // end input potrebbe non esistere ancora nell'HTML: gestiscilo in sicurezza
+  const endInput = document.getElementById("schEndTime");
+
   if (id==null){
     $("#schHdr").textContent = "Nuova schedulazione";
     const now = new Date();
     const hh = pad2(now.getHours());
     const mm = pad2(now.getMinutes());
     $("#schTime").value = `${hh}:${mm}`;
+    if (endInput) endInput.value = ""; // nessun valore di default
     setDaySelection("mon,tue,wed,thu,fri,sat,sun");
     setSchEnabledVisual(true);
   } else {
@@ -700,6 +703,7 @@ async function openSchModal(id=null){
     const row = S.schedules.find(x=>x.id===id);
     if (!row) { alert("Schedulazione non trovata"); return; }
     $("#schTime").value = row.time_hhmm;
+    if (endInput) endInput.value = row.end_time_hhmm || "";
     setDaySelection(row.days || "");
     $("#schPlSel").value = row.playlist_name;
     setSchEnabledVisual(!!row.enabled);
@@ -710,19 +714,23 @@ async function openSchModal(id=null){
 $("#schClose").onclick = ()=> schWrap.classList.remove("show");
 $("#btnNewSched").onclick = ()=> openSchModal(null);
 
-// ====== SALVA SCHEDULAZIONE (con ora di fine) ======
+// ====== SALVA SCHEDULAZIONE (con ora di fine opzionale) ======
 $("#schSave").onclick = async ()=> {
   if (!S.authed) return openLogin(true);
 
   const hhmm = ($("#schTime").value || "").trim();
-  const endhhmm = ($("#schEndTime").value || "").trim();
+  const endInput = document.getElementById("schEndTime");
+  const endhhmm = endInput ? (endInput.value || "").trim() : ""; // opzionale
   const days = getDaySelection();
   const pl   = $("#schPlSel").value;
   const wantEnabled = $("#schEnabled").dataset.on === "1";
 
   if (!/^\d\d:\d\d$/.test(hhmm)) return alert("Inserisci un orario di inizio HH:MM");
-  if (!/^\d\d:\d\d$/.test(endhhmm)) return alert("Inserisci un orario di fine HH:MM");
-  if (hhmm >= endhhmm) return alert("L’orario di fine deve essere successivo a quello di inizio");
+  // Se l'utente ha inserito la fine, validala; altrimenti ignorala
+  if (endhhmm) {
+    if (!/^\d\d:\d\d$/.test(endhhmm)) return alert("Orario di fine non valido (HH:MM)");
+    if (hhmm >= endhhmm) return alert("L’orario di fine deve essere successivo a quello di inizio");
+  }
   if (!days) return alert("Seleziona almeno un giorno");
   if (!pl) return alert("Seleziona una playlist");
 
@@ -737,9 +745,14 @@ $("#schSave").onclick = async ()=> {
   }
 
   try {
+    // Costruisci la query tenendo 'end' opzionale (il worker si aspetta &end=...)
+    const baseParams = `device=${encodeURIComponent(S.device)}&name=${encodeURIComponent(pl)}&time=${encodeURIComponent(hhmm)}&days=${encodeURIComponent(days)}&tz=${encodeURIComponent(DEFAULT_TZ)}`;
+    const endParam = endhhmm ? `&end=${encodeURIComponent(endhhmm)}` : "";
+    const fullParams = `${baseParams}${endParam}`;
+
     if (S.schedEditingId == null) {
       // nuova schedulazione
-      await api(`/api/sched/create?device=${encodeURIComponent(S.device)}&name=${encodeURIComponent(pl)}&time=${encodeURIComponent(hhmm)}&end_time=${encodeURIComponent(endhhmm)}&days=${encodeURIComponent(days)}&tz=${encodeURIComponent(DEFAULT_TZ)}`, { method:"POST" });
+      await api(`/api/sched/create?${fullParams}`, { method:"POST" });
       await loadSchedules();
       if (!wantEnabled) {
         const row = S.schedules.find(s => s.playlist_name===pl && s.time_hhmm===hhmm && String(s.days)===days);
@@ -750,7 +763,7 @@ $("#schSave").onclick = async ()=> {
       // modifica schedulazione
       const id = S.schedEditingId;
       await api(`/api/sched/delete?id=${id}`, { method:"DELETE" });
-      await api(`/api/sched/create?device=${encodeURIComponent(S.device)}&name=${encodeURIComponent(pl)}&time=${encodeURIComponent(hhmm)}&end_time=${encodeURIComponent(endhhmm)}&days=${encodeURIComponent(days)}&tz=${encodeURIComponent(DEFAULT_TZ)}`, { method:"POST" });
+      await api(`/api/sched/create?${fullParams}`, { method:"POST" });
       await loadSchedules();
       if (!wantEnabled) {
         const row = S.schedules.find(s => s.playlist_name===pl && s.time_hhmm===hhmm && String(s.days)===days);
@@ -775,7 +788,10 @@ async function loadSchedules(){
   S.schedules = (r.schedules || []).map(x=>({
     id:x.id, device:x.device, playlist_name:x.playlist_name,
     tz:x.tz, time_hhmm:x.time_hhmm, days:x.days, enabled:!!x.enabled,
-    last_fired_key: x.last_fired_key || null
+    last_fired_key: x.last_fired_key || null,
+    // Manteniamo anche i nuovi campi per futura UI
+    end_time_hhmm: x.end_time_hhmm || null,
+    last_stopped_key: x.last_stopped_key || null
   }));
 
   S.schedules.sort((a,b)=>{
