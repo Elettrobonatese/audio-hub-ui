@@ -682,7 +682,7 @@ async function openSchModal(id=null){
     const row = S.schedules.find(x=>x.id===id);
     if (!row) { alert("Schedulazione non trovata"); return; }
     $("#schTime").value = row.time_hhmm || "";
-    $("#schEndTime").value = row.end_hhmm || ""; // <-- prefill
+    $("#schEndTime").value = row.end_hhmm || ""; // <-- prefill dalla proprietà interna
     setDaySelection(row.days || "");
     $("#schPlSel").value = row.playlist_name;
     setSchEnabledVisual(!!row.enabled);
@@ -757,7 +757,9 @@ async function loadSchedules(){
   const r = await api(`/api/sched/list`);
   S.schedules = (r.schedules || []).map(x=>({
     id:x.id, device:x.device, playlist_name:x.playlist_name,
-    tz:x.tz, time_hhmm:x.time_hhmm, end_hhmm: x.end_hhmm || null,
+    tz:x.tz, time_hhmm:x.time_hhmm,
+    // mappa dalla colonna DB corretta:
+    end_hhmm: x.end_time_hhmm || null,
     days:x.days, enabled:!!x.enabled,
     last_fired_key: x.last_fired_key || null,
     last_stopped_key: x.last_stopped_key || null
