@@ -721,8 +721,8 @@ $("#schSave").onclick = async ()=> {
 
   try {
     const base = `/api/sched/create?device=${encodeURIComponent(S.device)}&name=${encodeURIComponent(pl)}&time=${encodeURIComponent(hhmm)}&days=${encodeURIComponent(days)}&tz=${encodeURIComponent(DEFAULT_TZ)}`;
-    const url = endhhmm ? `${base}&end_time=${encodeURIComponent(endhhmm)}` : base;
-
+    const url  = endhhmm ? `${base}&end_time=${encodeURIComponent(endhhmm)}&end_time_hhmm=${encodeURIComponent(endhhmm)}` : base;
+    
     if (S.schedEditingId == null) {
       await api(url, { method:"POST" });
       await loadSchedules();
