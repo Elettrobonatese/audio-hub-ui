@@ -139,6 +139,7 @@ $("#btnLogin").onclick = () => {
     openLogin(true);
   }
 };
+$("#btnRestart").onclick = restartAgent;
 $("#lgClose").onclick  = closeLogin;
 $("#lgEnter").onclick  = async () => {
   S.user = $("#lgUser").value.trim();
