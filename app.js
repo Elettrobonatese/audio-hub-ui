@@ -180,6 +180,24 @@ async function cmd(p){
   if (!S.authed) return openLogin(true);
   return api(`/api/cmd/${p}?device=${encodeURIComponent(S.device)}`, { method:"POST" });
 }
+
+// ====== DEVICE RAW SEND (per sync locale) ======
+async function deviceSendRaw(text){
+  if (!S.authed) return openLogin(true);
+  return api(`/api/devices/${encodeURIComponent(S.device)}/send`, { method:"POST", headers:{ "Content-Type":"text/plain" }, body: text });
+}
+async function deviceSync(text, okMsg){
+  try{
+    await deviceSendRaw(text);
+    if (okMsg) setTopStatus(okMsg, true);
+    return true;
+  }catch(e){
+    console.warn("deviceSync failed:", e);
+    setTopStatus("Sync locale non riuscita (PC non connesso?)", false);
+    return false;
+  }
+}
+
 $("#btnPlay").onclick  = () => cmd("play");
 $("#btnPause").onclick = () => cmd("pause");
 $("#btnStop").onclick  = () => cmd("stop");
@@ -320,6 +338,7 @@ async function listFiles(page = 1, perPage = 10){
     if (!S.authed) return openLogin(true);
     if(!confirm(`Eliminare ${b.dataset.key}?`)) return;
     await api(`/api/files/delete?r2_key=${encodeURIComponent(b.dataset.key)}`, { method:"DELETE" });
+      await deviceSendRaw(`delete-media|${b.dataset.key}`).catch(()=>{});
     await listFiles(page, perPage);
   });
 }
@@ -409,6 +428,7 @@ async function loadPlaylists(){
         await api(`/api/pl/delete?name=${encodeURIComponent(name)}`, { method:"DELETE" });
         await cmd("clear").catch(()=>{});
         await loadPlaylists();
+        await deviceSync(`sync-playlist-del|${name}`);
       }
       else if (act === "edit"){
         S.currentPl = name;
@@ -612,6 +632,7 @@ $("#plSave").onclick = async ()=>{
   });
 
   setTopStatus(`Playlist "${name}" salvata`, true);
+    await deviceSync(`sync-playlist|${name}`);
   plWrap.classList.remove("show");
   await loadPlaylists();
 };
@@ -627,6 +648,7 @@ $("#plDeleteBtn").onclick = async ()=>{
   setTopStatus(`Playlist "${name}" eliminata`, true);
   plWrap.classList.remove("show");
   await loadPlaylists();
+  await deviceSync(`sync-playlist-del|${name}`);
 };
 
 // ====== SCHEDULE (UI) ======
@@ -745,6 +767,7 @@ $("#schSave").onclick = async ()=> {
 
     schWrap.classList.remove("show");
     await loadSchedules();
+    await deviceSync("sync-schedules");
   } catch(e) {
     alert(e?.data?.reason || e.message || "Errore durante il salvataggio");
   }
@@ -819,6 +842,7 @@ function renderSchedules(){
           if (!confirm(msg)) return;
           await api(`/api/sched/toggle?id=${id}&enabled=${want}`, { method:"POST" });
           await loadSchedules();
+          await deviceSync("sync-schedules");
           setTopStatus(`Schedulazione ${want ? "attivata" : "disattivata"}`, true);
         }
         else if (act === "edit"){
@@ -828,6 +852,7 @@ function renderSchedules(){
           if (!confirm("Eliminare questa schedulazione?")) return;
           await api(`/api/sched/delete?id=${id}`, { method:"DELETE" });
           await loadSchedules();
+          await deviceSync("sync-schedules");
           setTopStatus("Schedulazione eliminata", true);
         }
         else if (act === "run"){
