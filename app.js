@@ -17,6 +17,9 @@ const S = {
   seeking: false,
   loopMode: "off", // "off" | "playlist" | "one"
 
+  // Playlist visualizzata in UI (non arriva da VLC)
+  lastPlaylist: localStorage.getItem("lastPlaylist") || "",
+
   // Files / Quota
   r2Items: [],
   totalBytes: 0,
@@ -61,10 +64,19 @@ function setAuthed(ok){
     : `<i data-lucide="log-in"></i> Login`;
   try { safeIcons(); } catch {}
 }
+
+function setNowPlaylist(name){
+  S.lastPlaylist = (name || "").trim();
+  localStorage.setItem("lastPlaylist", S.lastPlaylist);
+  const el = $("#nowPl");
+  if (el) el.textContent = `playlist: ${S.lastPlaylist || "—"}`;
+}
+
 function authHeaders(){
   const tok = btoa(`${S.user}:${S.pass}`);
   return { Authorization: `Basic ${tok}` };
 }
+
 async function api(path, {method="GET", headers={}, body}={}){
   const url = S.baseUrl.replace(/\/$/,"") + path;
   const res = await fetch(url, { method, headers: { ...authHeaders(), ...headers }, body });
@@ -77,32 +89,39 @@ async function api(path, {method="GET", headers={}, body}={}){
   if(!res.ok) throw Object.assign(new Error(data?.reason || txt || res.statusText), { status:res.status, data });
   return data;
 }
+
 function fmtTime(sec){
   sec = Math.max(0, ~~sec);
   const m = ~~(sec/60), s = sec%60;
   return `${m}:${String(s).padStart(2,"0")}`;
 }
+
 function setTopStatus(t, ok=true){
   const el = $("#topStatus");
   el.textContent = t;
   el.className = ok ? "ok" : "err";
 }
+
 function highlightRow(el, on){
   el.style.background = on ? "#15233b" : "";
   el.style.borderColor = on ? "#26436f" : "";
 }
+
 function normalizeDays(arr){
   const order = ["mon","tue","wed","thu","fri","sat","sun"];
   const set = new Set(arr.map(x=>x.toLowerCase()));
   return order.filter(d=>set.has(d)).join(",");
 }
+
 function daysToHuman(str){
   const map = {mon:"Lun",tue:"Mar",wed:"Mer",thu:"Gio",fri:"Ven",sat:"Sab",sun:"Dom"};
   return (str||"").split(",").map(x=>map[x]||x).join(", ");
 }
+
 function pad2(n){ return String(n).padStart(2,"0"); }
 function toMB(bytes){ return (bytes/1024/1024); }
 function fmtMB(bytes){ return `${toMB(bytes).toFixed(2)} MB`; }
+
 function updateQuotaUi(){
   const usedMB = toMB(S.totalBytes);
   const pct = Math.min(100, (usedMB / QUOTA_MB_LIMIT) * 100);
@@ -112,6 +131,7 @@ function updateQuotaUi(){
 
 // ====== LOGIN MODAL ======
 const loginWrap = $("#loginWrap");
+
 function openLogin(force=false){
   $("#lgUser").value = S.user || "admin";
   $("#lgPass").value = S.pass || "";
@@ -123,11 +143,13 @@ function openLogin(force=false){
     setTimeout(() => $("#lgEnter").click(), 50);
   }
 }
+
 function closeLogin(){
   if (!S.authed) return;
   loginWrap.classList.remove("show");
   $("#lgClose").style.visibility = "visible";
 }
+
 $("#btnLogin").onclick = () => {
   if (S.authed) {
     S.user = ""; S.pass = "";
@@ -139,8 +161,10 @@ $("#btnLogin").onclick = () => {
     openLogin(true);
   }
 };
+
 $("#btnRestart").onclick = restartAgent;
 $("#lgClose").onclick  = closeLogin;
+
 $("#lgEnter").onclick  = async () => {
   S.user = $("#lgUser").value.trim();
   S.pass = $("#lgPass").value;
@@ -160,6 +184,7 @@ $("#lgEnter").onclick  = async () => {
     console.error(e);
   }
 };
+
 $("#lgPass").addEventListener("keydown", (ev)=>{
   if (ev.key === "Enter") $("#lgEnter").click();
 });
@@ -167,13 +192,19 @@ $("#lgPass").addEventListener("keydown", (ev)=>{
 // ====== BOOT ======
 async function bootstrapAfterLogin(){
   if (!S.authed) return;
+
+  // mostra subito l'ultima playlist salvata
+  setNowPlaylist(S.lastPlaylist);
+
   await loadPlaylists();
   await listFiles();
   await loadSchedules();
+
   if(!S.timerState){
     S.timerState = setInterval(refreshState, 1000);
   }
 }
+
 window.addEventListener("load", () => { openLogin(false); });
 
 // ====== PLAYER CONTROLS ======
@@ -187,6 +218,7 @@ async function deviceSendRaw(text){
   if (!S.authed) return openLogin(true);
   return api(`/api/devices/${encodeURIComponent(S.device)}/send`, { method:"POST", headers:{ "Content-Type":"text/plain" }, body: text });
 }
+
 async function deviceSync(text, okMsg){
   try{
     await deviceSendRaw(text);
@@ -198,6 +230,7 @@ async function deviceSync(text, okMsg){
     return false;
   }
 }
+
 // ====== RESTART AGENT (device) ======
 async function restartAgent(){
   if (!S.authed) return openLogin(true);
@@ -238,10 +271,16 @@ async function restartAgent(){
 
 $("#btnPlay").onclick  = () => cmd("play");
 $("#btnPause").onclick = () => cmd("pause");
-$("#btnStop").onclick  = () => cmd("stop");
+$("#btnStop").onclick  = async () => {
+  await cmd("stop");
+  setNowPlaylist("");
+};
 $("#btnPrev").onclick  = () => cmd("prev");
 $("#btnNext").onclick  = () => cmd("next");
-$("#btnClear").onclick = () => cmd("clear");
+$("#btnClear").onclick = async () => {
+  await cmd("clear");
+  setNowPlaylist("");
+};
 
 // ====== VOLUME ======
 $("#btnVolAbs").onclick = async () => {
@@ -303,8 +342,8 @@ async function refreshState(){
     const title = meta.title || meta.filename || "—";
     $("#trkTitle").textContent = title;
 
-    const lastPl = st?.last_playlist || "—";
-    $("#nowPl").textContent = `playlist: ${lastPl}`;
+    // playlist "attiva" mostrata dalla webapp
+    setNowPlaylist(S.lastPlaylist);
 
     const repeatOn = !!info?.repeat;
     const loopOn   = !!info?.loop;
@@ -312,7 +351,7 @@ async function refreshState(){
     if (loopOn) mode = "playlist";
     else if (repeatOn) mode = "one";
     S.loopMode = mode;
-    updateLoopVisual(mode);
+    if (typeof updateLoopVisual === "function") updateLoopVisual(mode);
   }catch(e){
     console.warn("refreshState error", e);
   }
@@ -370,13 +409,16 @@ async function listFiles(page = 1, perPage = 10){
     await api(`/api/cmd/clear?device=${encodeURIComponent(S.device)}`, { method:"POST" }).catch(()=>{});
     await api(`/api/cmd/enqueue-r2?device=${encodeURIComponent(S.device)}&r2_key=${encodeURIComponent(key)}`, { method:"POST" });
     await api(`/api/cmd/play?device=${encodeURIComponent(S.device)}`, { method:"POST" });
+
+    // non è una playlist vera: la mostriamo come manuale
+    setNowPlaylist(`Manual: ${key}`);
   });
 
   $$("#r2Table .del").forEach(b=> b.onclick = async ()=>{
     if (!S.authed) return openLogin(true);
     if(!confirm(`Eliminare ${b.dataset.key}?`)) return;
     await api(`/api/files/delete?r2_key=${encodeURIComponent(b.dataset.key)}`, { method:"DELETE" });
-      await deviceSendRaw(`delete-media|${b.dataset.key}`).catch(()=>{});
+    await deviceSendRaw(`delete-media|${b.dataset.key}`).catch(()=>{});
     await listFiles(page, perPage);
   });
 }
@@ -457,9 +499,13 @@ async function loadPlaylists(){
     const act = btn.dataset.act;
     btn.onclick = async ()=>{
       if (!S.authed) return openLogin(true);
+
       if (act === "send"){
         await api(`/api/pl/send?name=${encodeURIComponent(name)}&device=${encodeURIComponent(S.device)}`, { method:"POST" });
         setTopStatus(`Playlist "${name}" inviata`, true);
+
+        // aggiorna playlist attiva in UI
+        setNowPlaylist(name);
       }
       else if (act === "delete"){
         if (!confirm(`Eliminare la playlist "${name}"?`)) return;
@@ -467,6 +513,7 @@ async function loadPlaylists(){
         await cmd("clear").catch(()=>{});
         await loadPlaylists();
         await deviceSync(`sync-playlist-del|${name}`);
+        if (S.lastPlaylist === name) setNowPlaylist("");
       }
       else if (act === "edit"){
         S.currentPl = name;
@@ -582,6 +629,7 @@ function renderPlLists(){
       updateSelections();
     };
   });
+
   $$("#plChosen .item").forEach(div=>{
     const i = parseInt(div.dataset.idx,10);
     div.onclick = ()=>{
@@ -599,6 +647,7 @@ function renderPlLists(){
       renderPlLists();
     };
   });
+
   $$("#plChosen .rm").forEach(btn=>{
     btn.onclick = ()=>{
       const i = parseInt(btn.dataset.idx,10);
@@ -607,6 +656,7 @@ function renderPlLists(){
       renderPlLists();
     };
   });
+
   $$("#plChosen .up").forEach(btn=>{
     btn.onclick = ()=>{
       const i = parseInt(btn.dataset.idx,10);
@@ -614,6 +664,7 @@ function renderPlLists(){
       renderPlLists();
     };
   });
+
   $$("#plChosen .down").forEach(btn=>{
     btn.onclick = ()=>{
       const i = parseInt(btn.dataset.idx,10);
@@ -628,12 +679,14 @@ function renderPlLists(){
     S.selChosenIdx = i-1;
     renderPlLists();
   };
+
   $("#plDown").onclick = ()=>{
     const i = S.selChosenIdx; if (i==null || i>=S.plChosen.length-1) return;
     const t=S.plChosen[i]; S.plChosen[i]=S.plChosen[i+1]; S.plChosen[i+1]=t;
     S.selChosenIdx = i+1;
     renderPlLists();
   };
+
   $("#plDelItem").onclick = ()=>{
     const i = S.selChosenIdx; if (i==null) return;
     S.plChosen.splice(i,1); S.selChosenIdx = null;
@@ -670,7 +723,9 @@ $("#plSave").onclick = async ()=>{
   });
 
   setTopStatus(`Playlist "${name}" salvata`, true);
-    await deviceSync(`sync-playlist|${name}`);
+  await deviceSync(`sync-playlist|${name}`);
+  setNowPlaylist(name);
+
   plWrap.classList.remove("show");
   await loadPlaylists();
 };
@@ -684,6 +739,9 @@ $("#plDeleteBtn").onclick = async ()=>{
   await api(`/api/pl/delete?name=${encodeURIComponent(name)}`, { method:"DELETE" });
   await cmd("clear").catch(()=>{});
   setTopStatus(`Playlist "${name}" eliminata`, true);
+
+  if (S.lastPlaylist === name) setNowPlaylist("");
+
   plWrap.classList.remove("show");
   await loadPlaylists();
   await deviceSync(`sync-playlist-del|${name}`);
@@ -701,6 +759,7 @@ function setSchEnabledVisual(on){
     : `<i data-lucide="power"></i> OFF`;
   try { safeIcons(); } catch {}
 }
+
 schEnabledBtn.onclick = ()=>{
   const on = schEnabledBtn.dataset.on === "1";
   setSchEnabledVisual(!on);
@@ -711,14 +770,17 @@ function getDaySelection(){
   const sel = Array.from(boxes).filter(b=>b.checked).map(b=>b.value);
   return normalizeDays(sel);
 }
+
 function setDaySelection(daysCsv){
   const set = new Set((daysCsv||"").split(","));
   $$(".schDay").forEach(b=> b.checked = set.has(b.value));
 }
+
 function populatePlSelect(){
   const sel = $("#schPlSel");
   sel.innerHTML = (S.playlistsCache||[]).map(n=>`<option value="${n}">${n}</option>`).join("");
 }
+
 async function openSchModal(id=null){
   if (!S.authed) return openLogin(true);
   S.schedEditingId = id;
@@ -742,7 +804,7 @@ async function openSchModal(id=null){
     const row = S.schedules.find(x=>x.id===id);
     if (!row) { alert("Schedulazione non trovata"); return; }
     $("#schTime").value = row.time_hhmm || "";
-    $("#schEndTime").value = row.end_hhmm || ""; // <-- prefill dalla proprietà interna
+    $("#schEndTime").value = row.end_hhmm || ""; // prefill
     setDaySelection(row.days || "");
     $("#schPlSel").value = row.playlist_name;
     setSchEnabledVisual(!!row.enabled);
@@ -750,6 +812,7 @@ async function openSchModal(id=null){
 
   schWrap.classList.add("show");
 }
+
 $("#schClose").onclick = ()=> schWrap.classList.remove("show");
 $("#btnNewSched").onclick = ()=> openSchModal(null);
 
@@ -782,7 +845,7 @@ $("#schSave").onclick = async ()=> {
   try {
     const base = `/api/sched/create?device=${encodeURIComponent(S.device)}&name=${encodeURIComponent(pl)}&time=${encodeURIComponent(hhmm)}&days=${encodeURIComponent(days)}&tz=${encodeURIComponent(DEFAULT_TZ)}`;
     const url  = endhhmm ? `${base}&end_time=${encodeURIComponent(endhhmm)}&end_time_hhmm=${encodeURIComponent(endhhmm)}` : base;
-    
+
     if (S.schedEditingId == null) {
       await api(url, { method:"POST" });
       await loadSchedules();
@@ -819,7 +882,6 @@ async function loadSchedules(){
   S.schedules = (r.schedules || []).map(x=>({
     id:x.id, device:x.device, playlist_name:x.playlist_name,
     tz:x.tz, time_hhmm:x.time_hhmm,
-    // mappa dalla colonna DB corretta:
     end_hhmm: x.end_time_hhmm || null,
     days:x.days, enabled:!!x.enabled,
     last_fired_key: x.last_fired_key || null,
@@ -896,6 +958,9 @@ function renderSchedules(){
         else if (act === "run"){
           await api(`/api/sched/run-now?id=${id}`, { method:"POST" });
           setTopStatus("Avviata ora", true);
+
+          // aggiorna playlist attiva in UI
+          setNowPlaylist(row.playlist_name);
         }
       };
     });
