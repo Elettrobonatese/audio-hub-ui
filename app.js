@@ -197,6 +197,43 @@ async function deviceSync(text, okMsg){
     return false;
   }
 }
+// ====== RESTART AGENT (device) ======
+async function restartAgent(){
+  if (!S.authed) return openLogin(true);
+
+  if (!confirm("Riavviare l'Agent sul PC?")) return;
+
+  try{
+    setTopStatus("Riavvio Agent in corso… (attendi qualche secondo)", true);
+
+    // invio comando via WS al device
+    await deviceSendRaw("restart-agent").catch(()=>{});
+
+    // dopo un attimo provo a rileggere lo status
+    setTimeout(async ()=>{
+      try{
+        const st = await api(`/api/devices/${encodeURIComponent(S.device)}/status`);
+        setTopStatus(`OK · device ${S.device} connected=${st.connected}`, true);
+      }catch(e){
+        setTopStatus("Riavvio inviato. In attesa che il PC si riconnetta…", true);
+      }
+    }, 3500);
+
+    // secondo check più “tranquillo”
+    setTimeout(async ()=>{
+      try{
+        const st = await api(`/api/devices/${encodeURIComponent(S.device)}/status`);
+        setTopStatus(`OK · device ${S.device} connected=${st.connected}`, true);
+      }catch(e){
+        setTopStatus("Agent non ancora connesso. Riprova tra pochi secondi.", false);
+      }
+    }, 9000);
+
+  }catch(e){
+    console.error(e);
+    setTopStatus("Errore durante richiesta riavvio Agent", false);
+  }
+}
 
 $("#btnPlay").onclick  = () => cmd("play");
 $("#btnPause").onclick = () => cmd("pause");
