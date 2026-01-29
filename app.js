@@ -129,112 +129,6 @@ function updateQuotaUi(){
   $("#quotaBar").style.width = `${pct}%`;
 }
 
-function hhmmToMin(hhmm){
-  if (!/^\d\d:\d\d$/.test(hhmm||"")) return null;
-  const [h,m] = hhmm.split(":").map(x=>parseInt(x,10));
-  if (!Number.isFinite(h) || !Number.isFinite(m)) return null;
-  return h*60 + m;
-}
-
-function dateToDayKey(d){
-  // getDay(): 0=Sun ... 6=Sat
-  return ["sun","mon","tue","wed","thu","fri","sat"][d.getDay()];
-}
-
-function pickActiveScheduledPlaylist(now = new Date()){
-  if (!Array.isArray(S.schedules) || S.schedules.length === 0) return null;
-
-  const dayKey = dateToDayKey(now);
-  const nowMin = now.getHours()*60 + now.getMinutes();
-
-  const isDayOk = (daysCsv) => {
-    const set = new Set(String(daysCsv||"").split(",").map(x=>x.trim().toLowerCase()).filter(Boolean));
-    return set.has(dayKey);
-  };
-
-  // 1) prima priorità: regole con END (finestra “sicura”)
-  const windowed = [];
-  for (const s of S.schedules){
-    if (!s.enabled) continue;
-    if (!isDayOk(s.days)) continue;
-
-    const start = hhmmToMin(s.time_hhmm);
-    if (start == null) continue;
-
-    const end = s.end_hhmm ? hhmmToMin(s.end_hhmm) : null;
-    if (end != null){
-      // (nel tuo UI impedisci end <= start, quindi niente wrap)
-      if (start <= nowMin && nowMin < end){
-        windowed.push({ name: s.playlist_name, start });
-      }
-    }
-  }
-  if (windowed.length){
-    windowed.sort((a,b)=>b.start-a.start); // la più “recente” vince
-    return { name: windowed[0].name, windowed:true };
-  }
-
-  // 2) fallback: regole senza END (meno certe) -> scegli l’ultima partenza <= ora
-  const startOnly = [];
-  for (const s of S.schedules){
-    if (!s.enabled) continue;
-    if (!isDayOk(s.days)) continue;
-
-    const start = hhmmToMin(s.time_hhmm);
-    if (start == null) continue;
-
-    if (!s.end_hhmm && start <= nowMin){
-      startOnly.push({ name:s.playlist_name, start });
-    }
-  }
-  if (startOnly.length){
-    startOnly.sort((a,b)=>b.start-a.start);
-    return { name: startOnly[0].name, windowed:false };
-  }
-
-  return null;
-}
-
-function readPlaylistFromApiState(st, info){
-  // prova vari nomi possibili (dipende dal Worker)
-  return (
-    st?.last_playlist ||
-    st?.lastPlaylist ||
-    st?.playlist ||
-    st?.playlist_name ||
-    st?.active_playlist ||
-    st?.activePlaylist ||
-    info?.playlist ||
-    info?.playlist_name ||
-    ""
-  );
-}
-
-function updateNowPlaylistSmart(st, info){
-  const apiPl = (readPlaylistFromApiState(st, info) || "").trim();
-  if (apiPl){
-    setNowPlaylist(apiPl);
-    return;
-  }
-
-  const pick = pickActiveScheduledPlaylist(new Date());
-  if (pick?.name){
-    // se è una finestra con END, siamo “sicuri” -> sovrascrivi sempre
-    if (pick.windowed) {
-      setNowPlaylist(pick.name);
-      return;
-    }
-    // se è start-only (senza END) è meno certo -> aggiorna solo se in UI è vuoto/—
-    if (!S.lastPlaylist || S.lastPlaylist === "—") {
-      setNowPlaylist(pick.name);
-      return;
-    }
-  }
-
-  // altrimenti lascia quello che c'è già (o —)
-  setNowPlaylist(S.lastPlaylist || "");
-}
-
 // ====== LOGIN MODAL ======
 const loginWrap = $("#loginWrap");
 
@@ -448,8 +342,8 @@ async function refreshState(){
     const title = meta.title || meta.filename || "—";
     $("#trkTitle").textContent = title;
 
-    // Playlist attiva: prova da API, altrimenti deduci da schedulazioni
-    updateNowPlaylistSmart(st, info)
+    // playlist "attiva" mostrata dalla webapp
+    setNowPlaylist(S.lastPlaylist);
 
     const repeatOn = !!info?.repeat;
     const loopOn   = !!info?.loop;
@@ -1002,8 +896,6 @@ async function loadSchedules(){
   });
 
   renderSchedules();
-  // aggiorna subito la label playlist usando le schedulazioni appena caricate
-  updateNowPlaylistSmart(null, null);
 }
 
 function renderSchedules(){
